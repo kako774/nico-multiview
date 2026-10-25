@@ -1,0 +1,4 @@
+# このサイトは https://nico-ran.stream/tools/nico-multiview/ に移転しました
+/img/* https://nico-ran.stream/tools/nico-multiview/img/:splat 301
+/ https://nico-ran.stream/tools/nico-multiview/ 301
+/* https://nico-ran.stream/tools/nico-multiview/ 301

@@ -1,7 +1,7 @@
 # ニコ生マルチビュー(アプリのソース)
 
 ニコニコ生放送を複数枠まとめて同時視聴する Windows 用デスクトップアプリ(Electron)です。
-使い方は、配布フォルダの `使い方.html` か、[サイト](https://nico-multiview.pages.dev) を見てください。
+使い方は、配布フォルダの `使い方.html` か、[サイト](https://nico-ran.stream/tools/nico-multiview/) を見てください。
 
 ## 動かす(開発用)
 1. [Node.js](https://nodejs.org/)(LTS)をインストール

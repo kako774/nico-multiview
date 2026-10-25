@@ -3,7 +3,7 @@
 ニコニコ生放送を、複数の窓で同時に見るための Windows 用アプリです(非公式)。
 インストール不要。zip を展開して `NicoMultiView.exe` を起動するだけで使えます。
 
-**サイト: https://nico-multiview.pages.dev**
+**サイト: https://nico-ran.stream/tools/nico-multiview/**
 
 ![複数の放送を並べて視聴している画面](img/shot-menu.webp)
 

@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ニコ生マルチビュー | ニコ生を複数の窓で同時に見る(非公式・Windows)</title>
+<meta name="description" content="ニコニコ生放送を複数枠まとめて同時視聴できる Windows 用の非公式デスクトップアプリ。ギフトイベントの上位者を自動表示、枠ごとの音量・コメント、統合コメントビューア。インストール不要。">
+<link rel="canonical" href="https://nico-multiview.pages.dev/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="ニコ生マルチビュー - ニコ生を複数の窓で同時に">
+<meta property="og:description" content="ギフトイベント上位者の自動表示、枠ごとの音量・コメント、統合コメントビューア。Windows用の非公式アプリ(インストール不要)。">
+<meta property="og:url" content="https://nico-multiview.pages.dev/">
+<meta property="og:image" content="https://nico-multiview.pages.dev/img/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="ニコ生マルチビュー - ニコ生を複数の窓で同時に">
+<meta name="twitter:description" content="ギフトイベント上位者の自動表示、枠ごとの音量・コメント、統合コメントビューア。Windows用の非公式アプリ。">
+<meta name="twitter:image" content="https://nico-multiview.pages.dev/img/og.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231a73e8'/%3E%3Crect x='10' y='12' width='20' height='18' rx='3' fill='%23fff'/%3E%3Crect x='34' y='12' width='20' height='18' rx='3' fill='%23fff' opacity='.75'/%3E%3Crect x='10' y='34' width='20' height='18' rx='3' fill='%23fff' opacity='.75'/%3E%3Crect x='34' y='34' width='20' height='18' rx='3' fill='%23fff' opacity='.5'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#0f1115;--panel:#181b22;--line:#2a2f3a;--text:#e8eaf0;--sub:#9aa3b2;--accent:#4da3ff;--accent-bg:#1a73e8;--onaccent:#fff;
+  --warn-bg:#2a2112;--warn-line:#6b5420;--warn-text:#f0d9a0;--chip:#161a22;--shadow:0 12px 40px #0008;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#f4f6fa;--panel:#ffffff;--line:#d3d9e3;--text:#1a1f2b;--sub:#5b6577;--accent:#1a73e8;--accent-bg:#1a73e8;--onaccent:#fff;
+    --warn-bg:#fff7e0;--warn-line:#e6cf8a;--warn-text:#5c4a10;--chip:#eef1f6;--shadow:0 12px 40px #1a1f2b22;
+    color-scheme:light;
+  }
+}
+:root[data-theme="light"]{
+  --bg:#f4f6fa;--panel:#ffffff;--line:#d3d9e3;--text:#1a1f2b;--sub:#5b6577;--accent:#1a73e8;--accent-bg:#1a73e8;--onaccent:#fff;
+  --warn-bg:#fff7e0;--warn-line:#e6cf8a;--warn-text:#5c4a10;--chip:#eef1f6;--shadow:0 12px 40px #1a1f2b22;color-scheme:light;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Noto Sans JP","Yu Gothic UI","Meiryo","Hiragino Sans",sans-serif;font-size:16px;line-height:1.75}
+a{color:var(--accent)}
+.wrap{max-width:1040px;margin:0 auto;padding:0 20px}
+header.top{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+header.top .wrap{display:flex;align-items:center;gap:18px;height:56px}
+.brand{font-weight:800;font-size:17px;color:var(--text);text-decoration:none;white-space:nowrap}
+header.top nav{display:flex;gap:16px;margin-left:auto;font-size:14px;overflow-x:auto}
+header.top nav a{color:var(--sub);text-decoration:none;white-space:nowrap}
+header.top nav a:hover{color:var(--text)}
+.hero{padding:56px 0 24px;text-align:center}
+.badge{display:inline-block;font-size:12px;font-weight:700;padding:3px 12px;border-radius:99px;border:1px solid var(--line);color:var(--sub);background:var(--chip)}
+.hero h1{font-size:clamp(30px,6vw,52px);line-height:1.25;margin:18px 0 12px;letter-spacing:.01em}
+.hero p.lead{font-size:clamp(16px,2.4vw,19px);color:var(--sub);max-width:640px;margin:0 auto 26px}
+.dl{display:inline-flex;flex-direction:column;align-items:center;gap:6px}
+.btn{display:inline-flex;align-items:center;gap:10px;font:inherit;font-weight:800;font-size:18px;padding:15px 30px;border-radius:12px;border:0;background:var(--accent-bg);color:var(--onaccent);text-decoration:none;cursor:pointer;box-shadow:0 6px 20px #1a73e855}
+.btn:hover{filter:brightness(1.08)}
+.btn[aria-disabled="true"]{opacity:.55;pointer-events:none}
+.dl small{color:var(--sub);font-size:13px}
+.shot{margin:38px auto 0;max-width:980px;border-radius:12px;border:1px solid var(--line);box-shadow:var(--shadow);overflow:hidden;background:var(--panel)}
+.shot img{display:block;width:100%;height:auto}
+.cap{font-size:13px;color:var(--sub);text-align:center;margin:10px 0 0}
+section{padding:56px 0 8px}
+section h2{font-size:clamp(22px,4vw,30px);margin:0 0 8px;line-height:1.35}
+section .sub{color:var(--sub);margin:0 0 26px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+.card h3{margin:0 0 6px;font-size:17px}
+.card p{margin:0;color:var(--sub);font-size:15px;line-height:1.7}
+.card .ic{font-size:22px;margin-bottom:6px;display:block}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:center}
+@media (max-width:760px){.two{grid-template-columns:1fr}}
+.two .txt h3{margin:0 0 8px;font-size:20px}
+.two .txt p{color:var(--sub);margin:0 0 10px}
+.medals{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 0}
+.medal{font-size:12px;font-weight:800;padding:2px 9px;border-radius:6px}
+.m1{background:linear-gradient(135deg,#ffe27a,#e0a800);color:#3a2a00}
+.m2{background:linear-gradient(135deg,#f1f4f8,#aab3bf);color:#2a313b}
+.m3{background:linear-gradient(135deg,#e8a56a,#b0662a);color:#2e1604}
+ol.steps{list-style:none;counter-reset:s;margin:0;padding:0;display:grid;gap:12px}
+ol.steps li{counter-increment:s;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px 16px 62px;position:relative}
+ol.steps li::before{content:counter(s);position:absolute;left:18px;top:14px;width:30px;height:30px;border-radius:50%;background:var(--accent-bg);color:var(--onaccent);display:grid;place-items:center;font-weight:800}
+ol.steps b{display:block}
+ol.steps span{color:var(--sub);font-size:15px}
+.note{background:var(--warn-bg);border:1px solid var(--warn-line);color:var(--warn-text);border-radius:12px;padding:16px 20px;margin-top:16px;font-size:15px}
+.note b{display:block;margin-bottom:4px}
+.note ul{margin:6px 0 0;padding-left:1.2em}
+details{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:0 18px;margin-bottom:10px}
+details summary{cursor:pointer;font-weight:700;padding:14px 0;list-style:none;display:flex;justify-content:space-between;gap:12px}
+details summary::-webkit-details-marker{display:none}
+details summary::after{content:"+";color:var(--sub);font-weight:400;font-size:20px;line-height:1.2}
+details[open] summary::after{content:"−"}
+details p{margin:0 0 14px;color:var(--sub);font-size:15px}
+.legal{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px 24px}
+.legal h3{margin:18px 0 6px;font-size:16px}
+.legal h3:first-child{margin-top:0}
+.legal p,.legal li{color:var(--sub);font-size:15px}
+.legal ul{padding-left:1.2em;margin:4px 0}
+code{font-family:ui-monospace,Consolas,monospace;font-size:.92em;background:var(--chip);padding:1px 6px;border-radius:5px}
+footer{margin-top:56px;border-top:1px solid var(--line);padding:26px 0 40px;color:var(--sub);font-size:13px}
+footer p{margin:4px 0}
+.theme{margin-left:10px;font:inherit;font-size:12px;color:var(--sub);background:transparent;border:1px solid var(--line);border-radius:8px;padding:3px 10px;cursor:pointer}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="#top">ニコ生マルチビュー</a>
+  <nav aria-label="ページ内メニュー">
+    <a href="#features">機能</a><a href="#gift">ギフトイベント</a><a href="#install">使い方</a><a href="#faq">よくある質問</a><a href="#legal">注意事項</a>
+  </nav>
+</div></header>
+
+<main id="top">
+<div class="wrap">
+  <div class="hero">
+    <span class="badge">非公式ツール / Windows 10・11(64bit)</span>
+    <h1>ニコ生を、<br>複数の窓で同時に。</h1>
+    <p class="lead">気になる放送を、画面にまとめて並べて視聴。音量やコメントは枠ごとに調整、ギフトイベントの上位者は自動で並びます。インストール不要、展開してすぐ起動。</p>
+    <div class="dl">
+      <a id="dlBtn" class="btn" href="https://github.com/kako774/nico-multiview/releases/latest/download/NicoMultiView-win.zip" rel="noopener">⬇ ダウンロード(Windows)</a>
+      <small>バージョン <span id="ver">1.0.0</span> ・ 約150MB(zip) ・ 無料</small>
+    </div>
+    <div class="shot"><img src="img/shot-menu.webp" width="1600" height="900" alt="ニコ生マルチビューで4つの放送を並べて視聴している画面" fetchpriority="high"></div>
+    <p class="cap">画面はイメージです(配信者・放送名は架空)</p>
+  </div>
+</div>
+
+<section id="features"><div class="wrap">
+  <h2>できること</h2>
+  <p class="sub">複数の放送を見比べたり、ながら見したりするための機能を揃えました。</p>
+  <div class="grid">
+    <div class="card"><span class="ic">🧩</span><h3>最大12枠を同時に表示</h3><p>自動グリッド・メイン+サブ・横一列・縦一列。枠はつかんでドラッグして並べ替え。映像そのものをドラッグしてもOKです。</p></div>
+    <div class="card"><span class="ic">🔊</span><h3>枠ごとの音量と音声ON/OFF</h3><p>音量スライダーは枠ごとに独立。複数の枠の音声を同時に出すことも、1枠だけに絞ることもできます。</p></div>
+    <div class="card"><span class="ic">💬</span><h3>コメント投稿と枠ごとの表示切替</h3><p>公式ログインでコメントを投稿(184対応)。映像に流れるコメントは、枠ごとに隠せます。</p></div>
+    <div class="card"><span class="ic">🗂</span><h3>統合コメントビューア</h3><p>全枠のコメントを時系列にまとめて、別窓で表示。放送ごとの色分け・検索・文字サイズ・最前面表示に対応。位置と大きさは次回も保たれます。</p></div>
+    <div class="card"><span class="ic">🔎</span><h3>放送者名で検索して追加</h3><p>名前を入力すると、いま放送中の人が候補に出ます。lv番号や放送URLの貼り付け、ブラウザからのリンクのドラッグ&ドロップでも追加できます。</p></div>
+    <div class="card"><span class="ic">⏪</span><h3>タイムシフトの巻き戻し</h3><p>枠にマウスを乗せるとシークバーが出ます。⏪(10秒戻し)とLIVE(ライブへ戻る)のボタン付き。※ニコ生プレミアム会員向けの機能です。</p></div>
+    <div class="card"><span class="ic">📁</span><h3>枠の保存と呼び出し</h3><p>いま開いている枠に名前を付けて保存。いつもの組み合わせをワンクリックで開けます。</p></div>
+    <div class="card"><span class="ic">🌗</span><h3>ライト / ダーク</h3><p>OSの設定に合わせる「自動」のほか、ライトとダークを選べます。</p></div>
+    <div class="card"><span class="ic">🖥</span><h3>プレイヤーだけを表示</h3><p>ページの余計な部分を隠して、映像とコメントだけを枠いっぱいに表示します(切り替え可能)。</p></div>
+  </div>
+</div></section>
+
+<section id="gift"><div class="wrap">
+  <h2>ギフトイベントの上位者を自動で並べる</h2>
+  <p class="sub">イベントを選ぶだけ。順位が入れ替わると、枠も自動で入れ替わります。</p>
+  <div class="two">
+    <div class="shot" style="margin:0"><img src="img/shot-gift.webp" width="1600" height="900" alt="ギフトイベントの1位から4位までの放送が順位バッジ付きで並んでいる画面" loading="lazy"></div>
+    <div class="txt">
+      <h3>一覧から選ぶ → 上位が並ぶ</h3>
+      <p>「🎁 ギフトイベント」を押して、開催中のイベントを選択。上位1〜12位のうち、いま放送中の人の枠が順位順に並びます。</p>
+      <p>1分ごとに順位を取り直し、入れ替わったら枠も移動。ラベルに順位・ポイント・召喚獣(通常/改/神)の数が出ます。</p>
+      <div class="medals"><span class="medal m1">🥇 1位 金</span><span class="medal m2">🥈 2位 銀</span><span class="medal m3">🥉 3位 銅</span></div>
+      <p style="margin-top:12px">追跡を始めるときは、いま開いている枠を閉じる前に、保存するかどうかを確認します。</p>
+    </div>
+  </div>
+</div></section>
+
+<section id="install"><div class="wrap">
+  <h2>使い方</h2>
+  <p class="sub">インストーラーはありません。3ステップで始められます。</p>
+  <ol class="steps">
+    <li><b>zip をダウンロードして、好きな場所に展開</b><span>「すべて展開」でフォルダごと取り出します。フォルダの中身は移動・削除しないでください(exe だけ別の場所に移すと動きません)。</span></li>
+    <li><b><code>NicoMultiView.exe</code> をダブルクリック</b><span>初回は、Windows が「PCが保護されました」と表示することがあります。<b style="display:inline">「詳細情報」→「実行」</b>で起動できます(このアプリは署名されていないためです)。</span></li>
+    <li><b>放送を追加する</b><span>上の入力欄に放送者名を入れて候補から選ぶか、放送URLを貼り付け。コメントするには、右上の「ニコニコにログイン」からログインします。</span></li>
+  </ol>
+  <div class="note"><b>うまく動かないとき</b>
+    <ul>
+      <li>展開せずに zip の中から起動すると動きません。必ず展開してください。</li>
+      <li>映像・音声が止まった枠は、枠のヘッダの「↻」で読み込み直せます。</li>
+      <li>アンインストールは、展開したフォルダを削除するだけです。</li>
+    </ul>
+  </div>
+</div></section>
+
+<section id="faq"><div class="wrap">
+  <h2>よくある質問</h2>
+  <p class="sub">&nbsp;</p>
+  <details><summary>料金はかかりますか?</summary><p>アプリは無料です。ニコ生側の有料機能(プレミアム会員向けのタイムシフトなど)は、ニコニコ側の契約に従います。</p></details>
+  <details><summary>ログイン情報は保存されますか?</summary><p>ログインはニコニコ公式のログイン画面で行い、パスワードをこのアプリが受け取ったり保存したりすることはありません。ログイン状態(Cookie)は、ふつうのブラウザと同じように、この PC のアプリ用データフォルダに残ります。右上の「ログアウト」で消せます。</p></details>
+  <details><summary>どこと通信しますか?</summary><p>ニコニコ関連のサーバー(放送の視聴、検索、ギフトイベントの順位など)にだけ接続します。利用状況の収集や、開発者のサーバーへの送信はありません。</p></details>
+  <details><summary>録画や配信はできますか?</summary><p>できません。このアプリは映像を保存も再配信もせず、公式のプレイヤーで再生しているだけです。画面録画などで公開する場合は、配信者の権利への配慮をお願いします。</p></details>
+  <details><summary>放送者名で検索しても出てこない人がいます</summary><p>名前の検索は「いま放送中の枠がある人」だけが対象です。放送していない人や、ニコニコ側の検索の仕様で見つからない人は出ません。その場合は放送URL(またはlv番号)を貼って追加してください。</p></details>
+  <details><summary>ある日突然使えなくなることはありますか?</summary><p>あります。ニコニコ側のページや内部の仕様が変わると、一部(検索、順位の取得、プレイヤーの表示など)が動かなくなることがあります。非公式ツールのため、その場合は更新をお待ちください。</p></details>
+  <details><summary>Mac や スマホでは使えますか?</summary><p>現在は Windows 10 / 11(64bit)のみです。</p></details>
+</div></section>
+
+<section id="legal"><div class="wrap">
+  <h2>ご利用にあたって(必ずお読みください)</h2>
+  <p class="sub">非公式ツールです。内容に同意のうえ、ご利用ください。</p>
+  <div class="legal">
+    <h3>非公式であること</h3>
+    <p>「ニコ生マルチビュー」は個人が作った非公式のツールで、株式会社ドワンゴ・株式会社KADOKAWA および「ニコニコ」サービスとは一切関係がありません。「ニコニコ」「ニコ生」などの名称・ロゴの権利は、各権利者に帰属します。</p>
+    <h3>免責</h3>
+    <p>本ソフトウェアは現状のまま提供されます。利用によって生じたいかなる損害(アカウントへの措置を含む)についても、作者は責任を負いません。自己責任でご利用ください。</p>
+    <h3>配信者・視聴者の権利</h3>
+    <ul>
+      <li>映像・音声・コメントの著作権・肖像権などは、配信者や投稿者に帰属します。</li>
+      <li>このアプリで見た内容を録画・転載・再配信するときは、配信者の許可と各サービスの規約に従ってください。</li>
+    </ul>
+    <h3>ライセンス</h3>
+    <p>このアプリは Electron(MIT)と Chromium(BSDほか)を含みます。配布フォルダの <code>LICENSE.electron.txt</code> と <code>LICENSES.chromium.html</code> にライセンス全文があります。削除せずにお使いください。</p>
+    <h3>再配布について</h3>
+    <p>このページ以外での再配布・改変した配布は、ご遠慮ください(最新版と注意事項をここで案内しているためです)。</p>
+  </div>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+  <p>ニコ生マルチビュー ― 非公式ツール。ニコニコ・ドワンゴ・KADOKAWA とは関係ありません。</p>
+  <p>最終更新: 2026年10月25日 / v<span id="ver2">1.0.0</span>
+    <button class="theme" id="themeBtn" type="button" aria-label="表示の明るさを切り替える">☾ / ☀</button></p>
+</div></footer>
+
+<script>
+(function () {
+  var btn = document.getElementById('dlBtn');
+  // ダウンロード先がまだ設定されていないときは、押せない表示にする
+  if (!btn.getAttribute('href') || btn.getAttribute('href').indexOf('__') === 0) { btn.setAttribute('aria-disabled', 'true'); btn.removeAttribute('href'); btn.textContent = '公開準備中'; }
+  var root = document.documentElement, key = 'nmvSite.theme';
+  try { var t = localStorage.getItem(key); if (t === 'light' || t === 'dark') root.setAttribute('data-theme', t); } catch (e) {}
+  document.getElementById('themeBtn').addEventListener('click', function () {
+    var cur = root.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    var next = cur === 'light' ? 'dark' : 'light';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem(key, next); } catch (e) {}
+  });
+})();
+</script>
+</body>
+</html>

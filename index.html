@@ -97,6 +97,14 @@ code{font-family:ui-monospace,Consolas,monospace;font-size:.92em;background:var(
 footer{margin-top:56px;border-top:1px solid var(--line);padding:26px 0 40px;color:var(--sub);font-size:13px}
 footer p{margin:4px 0}
 .theme{margin-left:10px;font:inherit;font-size:12px;color:var(--sub);background:transparent;border:1px solid var(--line);border-radius:8px;padding:3px 10px;cursor:pointer}
+
+.share{display:inline-flex;align-items:center;gap:8px;font:inherit;font-weight:700;font-size:15px;padding:10px 20px;border-radius:99px;background:#000;color:#fff;text-decoration:none;border:1px solid #000}
+.share:hover{filter:brightness(1.25)}
+.share svg{width:16px;height:16px;fill:currentColor}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .share{background:#fff;color:#000;border-color:#fff}}
+:root[data-theme="dark"] .share{background:#fff;color:#000;border-color:#fff}
+.sharebox{margin-top:30px;text-align:center}
+.sharebox p{margin:0 0 10px;color:var(--sub);font-size:14px}
 </style>
 </head>
 <body>
@@ -117,6 +125,7 @@ footer p{margin:4px 0}
       <a id="dlBtn" class="btn" href="https://github.com/kako774/nico-multiview/releases/latest/download/NicoMultiView-win.zip" rel="noopener">⬇ ダウンロード(Windows)</a>
       <small>バージョン <span id="ver">1.0.0</span> ・ 約150MB(zip) ・ 無料</small>
     </div>
+    <div class="sharebox"><a class="share" href="https://twitter.com/intent/tweet?text=%E3%83%8B%E3%82%B3%E7%94%9F%E3%83%9E%E3%83%AB%E3%83%81%E3%83%93%E3%83%A5%E3%83%BC%20-%20%E3%83%8B%E3%82%B3%E7%94%9F%E3%82%92%E8%A4%87%E6%95%B0%E3%81%AE%E7%AA%93%E3%81%A7%E5%90%8C%E6%99%82%E3%81%AB%E8%A6%8B%E3%82%89%E3%82%8C%E3%82%8BWindows%E7%94%A8%E3%81%AE%E9%9D%9E%E5%85%AC%E5%BC%8F%E3%82%A2%E3%83%97%E3%83%AA&url=https%3A%2F%2Fnico-multiview.pages.dev%2F%3Fx" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>Xでシェア</a></div>
     <div class="shot"><img src="img/shot-menu.webp" width="1600" height="900" alt="ニコ生マルチビューで4つの放送を並べて視聴している画面" fetchpriority="high"></div>
     <p class="cap">画面はイメージです(配信者・放送名は架空)</p>
   </div>
@@ -205,6 +214,7 @@ footer p{margin:4px 0}
 </div></section>
 </main>
 
+<div class="wrap"><div class="sharebox"><p>このページを友だちに教える</p><a class="share" href="https://twitter.com/intent/tweet?text=%E3%83%8B%E3%82%B3%E7%94%9F%E3%83%9E%E3%83%AB%E3%83%81%E3%83%93%E3%83%A5%E3%83%BC%20-%20%E3%83%8B%E3%82%B3%E7%94%9F%E3%82%92%E8%A4%87%E6%95%B0%E3%81%AE%E7%AA%93%E3%81%A7%E5%90%8C%E6%99%82%E3%81%AB%E8%A6%8B%E3%82%89%E3%82%8C%E3%82%8BWindows%E7%94%A8%E3%81%AE%E9%9D%9E%E5%85%AC%E5%BC%8F%E3%82%A2%E3%83%97%E3%83%AA&url=https%3A%2F%2Fnico-multiview.pages.dev%2F%3Fx" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>Xでシェア</a></div></div>
 <footer><div class="wrap">
   <p>ニコ生マルチビュー ― 非公式ツール。ニコニコ・ドワンゴ・KADOKAWA とは関係ありません。</p>
   <p>最終更新: 2026年10月25日 / v<span id="ver2">1.0.0</span>

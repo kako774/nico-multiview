@@ -50,4 +50,5 @@
 
 ## このリポジトリについて
 
-配布サイト(静的ページ)のソースです。ビルドは不要で、Cloudflare Pages からそのまま公開しています。
+- ルートの `index.html` と `img/`: 配布サイト(静的ページ)です。ビルドは不要で、Cloudflare Pages からそのまま公開しています。
+- [`app/`](app): アプリ本体(Electron)のソースです。ビルド方法は [`app/README.md`](app/README.md) にあります。

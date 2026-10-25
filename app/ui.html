@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src https://*.nicovideo.jp https://*.nimg.jp">
+<title>ニコ生マルチビュー</title>
+<style>
+:root{
+  --bg:#0f1115;--panel:#181b22;--line:#2a2f3a;--text:#e8eaf0;--sub:#9aa3b2;--accent:#4da3ff;--danger:#ff6b6b;--ok:#5fd38d;
+  --input:#0c0e12;--btn:#232834;--btnhv:#44507a;--onaccent:#06121f;--tilebg:#05070a;--stagebg:#000;--tagbg:#000a;
+  --hl:#1d3a5c;--dragbg:#0b0e14;--dragon:#14263d;--chip:#161a22;--hover:#ffffff0a;--rowline:#ffffff08;
+  --c0:#4da3ff;--c1:#ff8a5c;--c2:#5fd38d;--c3:#e0b341;--c4:#c78bff;--c5:#ff6fa8;--c6:#4fd1d9;--c7:#a3b86c;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){
+  :root{
+    --bg:#f4f6fa;--panel:#ffffff;--line:#d3d9e3;--text:#1a1f2b;--sub:#5b6577;--accent:#1a73e8;--danger:#d93025;--ok:#188038;
+    --input:#ffffff;--btn:#eef1f6;--btnhv:#9db4dc;--onaccent:#ffffff;--tilebg:#dfe4ec;--stagebg:#e6eaf1;--tagbg:#ffffffd9;
+    --hl:#cfe0fb;--dragbg:#e3e8f0;--dragon:#cfe0fb;--chip:#f0f3f8;--hover:#0000000a;--rowline:#00000010;
+    --c0:#1a73e8;--c1:#d9531e;--c2:#188038;--c3:#9a6b00;--c4:#8a3ffc;--c5:#c2185b;--c6:#00838f;--c7:#5d6f1f;
+    color-scheme:light;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font-family:"Noto Sans JP","Yu Gothic UI","Meiryo","Hiragino Sans",sans-serif;font-size:14px}
+body{display:flex;flex-direction:column;overflow:hidden;user-select:none}
+#bar{flex:0 0 auto;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:7px 10px;background:var(--panel);border-bottom:1px solid var(--line)}
+#bar h1{font-size:15px;margin:0 6px 0 0;white-space:nowrap}
+#addForm{position:relative;display:flex;gap:6px;flex:1 1 320px;min-width:220px;max-width:560px}
+input[type=text]{min-width:0;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--input);color:var(--text);font:inherit;user-select:text}
+input[type=text]:focus{outline:2px solid var(--accent)}
+input[type=text]:disabled{opacity:.55}
+#addInput{flex:1}
+.sgmsg{padding:14px;color:var(--sub);text-align:center;font-size:13px}
+button,select{font:inherit;color:var(--text);background:var(--btn);border:1px solid var(--line);border-radius:8px;padding:7px 11px;cursor:pointer}
+button:hover:not(:disabled),select:hover{border-color:var(--btnhv)}
+button:disabled{opacity:.5;cursor:default}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--onaccent);font-weight:700}
+.chk{display:flex;align-items:center;gap:5px;color:var(--sub);cursor:pointer;white-space:nowrap}
+#auth{display:flex;align-items:center;gap:8px;margin-left:auto}
+#authState{font-size:12px;color:var(--sub);white-space:nowrap}
+#authState.in{color:var(--ok)}
+#evBtn.on{background:var(--btnhv)}
+#evChip{display:none;align-items:center;gap:6px;font-size:12px;padding:2px 8px;border:1px solid var(--line);border-radius:12px;max-width:300px}
+#evChip.show{display:inline-flex}#evChip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.evi{display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin:6px 0;cursor:pointer}
+.evi:hover,.evi.on{background:var(--hl)}
+.evi .k{font-size:11px;color:var(--sub)}
+.evi .t{flex:1;min-width:0;font-weight:700;font-size:13px}
+.rk{font-size:11px;font-weight:800;padding:1px 6px;border-radius:5px;background:#e8b923;color:#222;margin-right:5px}
+.rk{background:#8aa4d6;color:#10203a}
+.rk.r1{background:linear-gradient(135deg,#ffe27a,#e0a800);color:#3a2a00}
+.rk.r2{background:linear-gradient(135deg,#f1f4f8,#aab3bf);color:#2a313b}
+.rk.r3{background:linear-gradient(135deg,#e8a56a,#b0662a);color:#2e1604}
+.sm{display:inline-flex;gap:3px;margin-left:5px;vertical-align:middle}
+.sm i{font-style:normal;font-size:10px;font-weight:800;padding:0 3px;border-radius:5px;color:#fff}
+.sm{margin-left:3px;gap:2px}
+.head button.live{font-weight:800;font-size:11px;letter-spacing:.03em;color:#fff;background:#d93025;border-color:#d93025}
+.head button.live:hover{filter:brightness(1.1)}
+.tile.rkd .head{flex:0 0 auto;flex-wrap:wrap;row-gap:2px;padding:2px 4px}.tile.rkd .tag{min-width:11em}.tile.rkd .tag .tt{min-width:3em}
+.sm .n{background:#8e57d9}.sm .k{background:#e8782a}.sm .g{background:linear-gradient(90deg,#e0457b,#e8b923,#3fb6d9)}
+.sm i.z{opacity:.35}
+.tag{display:inline-flex;align-items:center;min-width:0}.tag .tt{overflow:hidden;text-overflow:ellipsis}.tag .rk,.tag .sm{flex:none}
+.tile.g1{border-color:#e0a800;box-shadow:inset 0 0 0 1px #e0a800}
+.tile.g2{border-color:#aab3bf;box-shadow:inset 0 0 0 1px #aab3bf}
+.tile.g3{border-color:#b0662a;box-shadow:inset 0 0 0 1px #b0662a}
+.row2{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;align-items:center}
+.row2 input[type=text]{flex:1;min-width:180px}
+#msg{font-size:12px;color:var(--sub);width:100%;display:none}
+#msg.show{display:block}#msg.err{color:var(--danger)}
+body.fs #bar{display:none}
+#wrap{position:relative;flex:1 1 auto;min-height:0;background:var(--stagebg)}
+#stage{position:absolute;inset:0;display:grid;gap:4px;padding:4px}
+.tile{display:flex;flex-direction:column;min-width:0;min-height:0;border:1px solid var(--line);border-radius:4px;background:var(--tilebg);overflow:hidden}
+.tile.dragover{outline:3px solid var(--accent);outline-offset:-3px}
+.tile.dragover .head{background:var(--hl)}
+.tile.dragsrc{opacity:.5}
+.head{user-select:none}
+/* ドラッグ中: 隠れた映像の代わりに、放送者名を大きく出してドロップ先にする */
+body.dragmode .content{display:flex;align-items:center;justify-content:center;font-size:clamp(14px,2.2vw,30px);font-weight:700;
+  color:var(--sub);text-align:center;padding:12px;background:var(--dragbg)}
+body.dragmode .content::after{content:attr(data-label);word-break:break-all}
+body.dragmode .tile.dragover .content{color:var(--text);background:var(--dragon)}
+body.dragmode .tile.dragsrc .content::after{content:attr(data-label) "\A(移動中)";white-space:pre}
+.head{flex:0 0 26px;display:flex;gap:4px;align-items:center;padding:0 4px;background:var(--panel);border-bottom:1px solid var(--line)}
+.head button.cm.off{opacity:.55;text-decoration:line-through}
+.vol{width:110px;height:14px;accent-color:var(--accent);cursor:pointer;flex:0 1 110px;min-width:28px;margin:0 2px}
+.volv{font-size:11px;color:var(--sub);min-width:3em;text-align:right;font-variant-numeric:tabular-nums;flex:0 0 auto}
+.tag{font-size:12px;font-weight:700;padding:1px 7px;border-radius:5px;background:var(--tagbg);cursor:grab;
+  min-width:3.6em;max-width:none;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.head .grow{flex:1;min-width:0}
+.head button{flex:0 0 auto;padding:1px 8px;font-size:12px;border-radius:5px;white-space:nowrap}
+.head button.on{border-color:var(--accent);color:var(--accent)}
+.head button.close:hover{border-color:var(--danger);color:var(--danger)}
+.content{flex:1 1 auto;min-height:0}
+.foot{flex:0 0 32px;display:none;gap:4px;align-items:center;padding:3px 4px;background:var(--panel);border-top:1px solid var(--line)}
+body.showCmt .foot{display:flex}
+.foot input{flex:1;padding:3px 8px;font-size:13px;border-radius:6px}
+.foot button{padding:2px 10px;font-size:12px;border-radius:6px}
+#empty{position:absolute;inset:0;display:none;place-items:center;text-align:center;color:var(--sub);padding:24px;line-height:1.9}
+#empty.show{display:grid}
+#empty b{color:var(--text);font-size:17px}
+#empty code{background:var(--btn);padding:1px 6px;border-radius:4px}
+</style>
+</head>
+<body class="showCmt">
+<div id="bar">
+  <h1>ニコ生マルチビュー</h1>
+  <form id="addForm" autocomplete="off">
+    <input id="addInput" type="text" placeholder="放送者名で検索 / lv番号 / 放送URL(複数まとめて貼付OK)" aria-label="放送を追加">
+    <button class="primary" type="submit">追加</button>
+  </form>
+  <select id="layout" aria-label="配置">
+    <option value="auto">自動グリッド</option>
+    <option value="main">メイン + サブ</option>
+    <option value="row">横一列</option>
+    <option value="col">縦一列</option>
+  </select>
+  <select id="theme" aria-label="テーマ" title="画面の明るさ">
+    <option value="system">テーマ: 自動</option>
+    <option value="light">ライト</option>
+    <option value="dark">ダーク</option>
+  </select>
+  <label class="chk" title="OFFにすると視聴ページ全体を表示します"><input id="playerOnly" type="checkbox" checked>プレイヤーのみ</label>
+  <label class="chk" title="各枠の下にコメント入力欄を出します"><input id="showCmt" type="checkbox" checked>コメント欄</label>
+  <label class="chk" title="184(投稿者を表示しない)でコメントします"><input id="use184" type="checkbox">184</label>
+  <button id="muteAll" type="button" title="全枠の音声を一括でOFF / ON">全て消音</button>
+  <button id="fsBtn" type="button" title="全画面(F11)。上のバーを隠して、枠だけを全画面で表示します。Escで戻ります">⛶ 全画面</button>
+  <button id="ppBtn" type="button" title="いま開いている枠を保存/呼び出し">📁 枠の保存</button>
+  <button id="evBtn" type="button" title="ギフトイベントの上位者の放送を自動で並べる">🎁 ギフトイベント</button>
+  <div id="evChip"><span id="evChipT"></span><button id="evStop" type="button" title="追跡をやめる(枠はそのまま残ります)">✕</button></div>
+  <button id="viewerBtn" type="button" title="全枠のコメントをまとめて表示する別窓を開く">コメントビューア</button>
+  <button id="clearBtn" type="button">全部閉じる</button>
+  <div id="auth">
+    <span id="authState">未ログイン</span>
+    <button id="authBtn" type="button">ニコニコにログイン</button>
+  </div>
+  <div id="msg" role="status"></div>
+</div>
+<div id="wrap">
+  <div id="stage"></div>
+  <div id="empty" class="show">
+    <div><b>見たい放送を追加してください</b><br>
+    上の入力欄に <code>lv123456789</code> または放送ページのURLを貼って「追加」<br>
+    複数まとめて貼ると一度に並びます(最大12枠)。音声は「🔊」を押した1枠だけ出ます<br>
+    コメントするには、右上の「ニコニコにログイン」からログインしてください</div>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const MAX = 12;
+  const $ = s => document.querySelector(s);
+  const stage = $('#stage'), emptyEl = $('#empty'), msg = $('#msg'), layoutSel = $('#layout');
+  let items = [], layout = 'auto', audioIds = [];   // 音声ONの枠(複数可)
+  let playerOnly = true, showCmt = true, use184 = false, loggedIn = false;
+  let theme = 'system';
+  let hideCmts = {};   // 枠ごとの「流れるコメントを隠す」
+  let volumes = {}, lastVol = 0.5;   // 枠ごとの音量(0〜1)と、最後に動かした音量(新しい枠の初期値)
+  let presets = [];   // 保存した枠 { name, items }
+  let evTrack = null, evKeys = [];   // 追跡中のイベント { key, title, n } / 手入力したイベントのキー
+  let evSig = null, evTimer = 0, evBusy = false, evGen = 0;   // evGen: 追跡を切り替えたときに、古い取得結果を捨てるための番号
+  const ranks = new Map();   // lv番号 -> { rank, score }
+  let evLvs = [];            // 自動で管理している枠
+  const infos = new Map();   // lv番号 -> { name: 放送者名, title: 番組名 }
+
+  const parseIds = t => [...new Set((String(t || '').match(/lv\d+/gi) || []).map(s => s.toLowerCase()))];
+  const persist = () => window.mv.save({ items, layout, audioIds, playerOnly, showCmt, use184, volumes, lastVol, hideCmts, theme, evTrack, evKeys, presets });
+  // 表示名: 放送者名(取得できるまではlv番号)
+  const nameOf = id => (infos.get(id) && infos.get(id).name) || id;
+
+  let msgTimer;
+  function say(text, err) {
+    msg.textContent = text; msg.className = 'show' + (err ? ' err' : '');
+    clearTimeout(msgTimer); msgTimer = setTimeout(() => { msg.className = ''; layoutNow(); }, 4500);
+    layoutNow();
+  }
+
+  /* ---------- ログイン表示 ---------- */
+  function renderAuth() {
+    $('#authState').textContent = loggedIn ? 'ログイン中' : '未ログイン';
+    $('#authState').className = loggedIn ? 'in' : '';
+    $('#authBtn').textContent = loggedIn ? 'ログアウト' : 'ニコニコにログイン';
+    document.querySelectorAll('.foot').forEach(f => {
+      const i = f.querySelector('input'), b = f.querySelector('button');
+      i.disabled = b.disabled = !loggedIn;
+      i.placeholder = loggedIn ? 'コメントを入力(Enterで送信)' : 'ログインするとコメントできます';
+    });
+  }
+
+  /* ---------- ラベル(放送者名) ---------- */
+  function updateTags() {
+    [...stage.children].forEach((t, i) => {
+      const id = t.dataset.id, info = infos.get(id);
+      const tag = t.querySelector('.tag');
+      const rk = ranks.get(id);
+      tag.textContent = '';
+      if (rk) { const b = document.createElement('span'); b.className = 'rk r' + rk.rank; b.textContent = (rk.rank <= 3 ? ['🥇', '🥈', '🥉'][rk.rank - 1] + ' ' : '') + rk.rank + '位'; tag.appendChild(b); }
+      const tt = document.createElement('span'); tt.className = 'tt';
+      tt.textContent = (layout === 'main' && i === 0 ? '★ ' : '') + nameOf(id) + (rk ? ` ${rk.score.toLocaleString('ja-JP')}pt` : '');
+      tag.appendChild(tt);
+      if (rk && rk.sm) {
+        const w = document.createElement('span'); w.className = 'sm'; w.title = '召喚獣の数(通常 / 改 / 神)';
+        [['n', '召', rk.sm.normal], ['k', '改', rk.sm.kai], ['g', '神', rk.sm.god]].forEach(([c, l, v]) => { const e = document.createElement('i'); e.className = c + (v ? '' : ' z'); e.textContent = `${l}${v}`; e.title = ({ n: '召喚獣', k: '召喚獣 改', g: '召喚獣 神' })[c] + ` ${v}個`; w.appendChild(e); });
+        tag.appendChild(w);
+      }
+      t.classList.toggle('rkd', !!rk); t.classList.remove('g1', 'g2', 'g3'); if (rk && rk.rank <= 3) t.classList.add('g' + rk.rank);
+      tag.title = nameOf(id) + '\n' + (info && info.title ? `${info.title}\n` : '') + id + '\nドラッグで並べ替え';
+    });
+  }
+
+  /* ---------- 配置 ---------- */
+  // ダブルクリックでその枠だけを表示(もう一度ダブルクリック / Escで元に戻る)
+  let focusId = '';
+  function toggleFocus(id) {
+    if (focusId === id) { focusId = ''; say('元の表示に戻しました'); }
+    else if (items.includes(id)) { focusId = id; say(`${nameOf(id)} だけを表示中(もう一度ダブルクリックかEscで戻る)`); }
+    render();
+  }
+  function applyGrid() {
+    const n = items.length;
+    stage.style.gridTemplateColumns = stage.style.gridTemplateRows = '';
+    if (focusId && !items.includes(focusId)) focusId = '';
+    [...stage.children].forEach(t => { t.style.display = focusId && t.dataset.id !== focusId ? 'none' : ''; });
+    if (!n) return;
+    if (focusId) {
+      stage.style.gridTemplateColumns = stage.style.gridTemplateRows = '1fr';
+      [...stage.children].forEach(t => { t.style.gridColumn = t.style.gridRow = ''; });
+      return;
+    }
+    if (layout === 'row') { stage.style.gridTemplateColumns = `repeat(${n},1fr)`; stage.style.gridTemplateRows = '1fr'; }
+    else if (layout === 'col') { stage.style.gridTemplateColumns = '1fr'; stage.style.gridTemplateRows = `repeat(${n},1fr)`; }
+    else if (layout === 'main' && n >= 2) { stage.style.gridTemplateColumns = '3fr 1fr'; stage.style.gridTemplateRows = `repeat(${n - 1},1fr)`; }
+    else {
+      const w = stage.clientWidth || innerWidth, h = stage.clientHeight || innerHeight;
+      const chrome = 27 + (showCmt ? 33 : 0);   // 各枠のヘッダ(+コメント欄)の高さ
+      let best = 1, bestScore = Infinity;
+      for (let c = 1; c <= n; c++) {
+        const r = Math.ceil(n / c);
+        const score = Math.abs(Math.log(((w / c) / Math.max(40, h / r - chrome)) / (16 / 9))) + (c * r - n) * 0.05;
+        if (score < bestScore) { bestScore = score; best = c; }
+      }
+      stage.style.gridTemplateColumns = `repeat(${best},1fr)`;
+      stage.style.gridTemplateRows = `repeat(${Math.ceil(n / best)},1fr)`;
+    }
+    [...stage.children].forEach((t, i) => {
+      if (layout === 'main' && n >= 2) {
+        t.style.gridColumn = i === 0 ? '1' : '2';
+        t.style.gridRow = i === 0 ? `1 / span ${n - 1}` : String(i);
+      } else { t.style.gridColumn = t.style.gridRow = ''; }
+    });
+  }
+
+  // 各枠の「映像エリア」の位置をメインプロセスへ送り、ネイティブのビューを重ねる
+  function sendRects() {
+    const rects = [...stage.children].map(t => {
+      const r = t.querySelector('.content').getBoundingClientRect();
+      return { id: t.dataset.id, x: r.left, y: r.top, w: r.width, h: r.height };
+    });
+    window.mv.sync(rects, audioIds, playerOnly, volumes, hideCmts);
+  }
+  let raf = 0;
+  function layoutNow() { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { applyGrid(); sendRects(); }); }
+
+  /* ---------- コメント送信 ---------- */
+  async function sendComment(id, input, btn) {
+    const text = input.value.trim();
+    if (!text) return;
+    input.disabled = btn.disabled = true;
+    let r;
+    try { r = await window.mv.comment(id, text, use184); } catch { r = { ok: false, error: '送信に失敗しました' }; }
+    input.disabled = btn.disabled = !loggedIn;
+    if (r && r.ok) { input.value = ''; }   // 成功時はメッセージを出さない
+    else say(`${nameOf(id)}: ${(r && r.error) || '送信できませんでした'}`, true);
+    if (loggedIn) input.focus();
+  }
+
+  /* ---------- 枠 ---------- */
+  function makeTile(id) {
+    const t = document.createElement('div');
+    t.className = 'tile'; t.dataset.id = id;
+    const head = document.createElement('div'); head.className = 'head';
+    head.addEventListener('dblclick', e => { if (!e.target.closest('button, input')) toggleFocus(id); });
+    const tag = document.createElement('span'); tag.className = 'tag';
+    const vol = document.createElement('input'); vol.type = 'range'; vol.className = 'vol'; vol.min = 0; vol.max = 100; vol.step = 1;
+    const volv = document.createElement('span'); volv.className = 'volv';
+    const shown = () => Math.round((typeof volumes[id] === 'number' ? volumes[id] : lastVol) * 100);
+    vol.value = shown(); volv.textContent = vol.value + '%'; vol.title = 'この枠の音量(音声ONの枠で聞こえます)';
+    vol.addEventListener('input', () => {
+      volumes[id] = lastVol = Number(vol.value) / 100; volv.textContent = vol.value + '%';
+      persist(); layoutNow();
+    });
+    const grow = document.createElement('span'); grow.className = 'grow';
+    const mk = (label, title, fn, cls) => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.title = title;
+      if (cls) b.className = cls; b.addEventListener('click', fn); return b;
+    };
+    const snd = mk('🔇', 'この枠の音声のON/OFF(複数の枠を同時にONにできます)', () => { audioIds = audioIds.includes(id) ? audioIds.filter(x => x !== id) : [...audioIds, id]; render(); }, 'snd');
+    const cm = mk('💬', 'この枠の、映像に流れるコメントを非表示/表示', () => {
+      hideCmts[id] = !hideCmts[id]; cm.classList.toggle('off', !!hideCmts[id]); persist(); layoutNow();
+    }, 'cm');
+    cm.classList.toggle('off', !!hideCmts[id]);
+    const rw = mk('⏪', '10秒戻す(タイムシフト・プレミアム会員)', () => window.mv.player(id, 'back'));
+    const lv = mk('LIVE', '現在のライブに戻る', () => window.mv.player(id, 'live'), 'live');
+    head.append(tag, grow, vol, volv, rw, lv, snd, cm,
+      mk('★', 'メインにする(この枠を先頭・大きい枠へ)', () => {
+        items = [id, ...items.filter(x => x !== id)]; if (layout === 'auto') layout = 'main'; render();
+      }),
+      mk('↻', '再読込(この枠だけ読み込み直す)', () => window.mv.reload(id)),
+      mk('↗', 'ブラウザで開く(既定のブラウザ)', () => window.mv.external(id)),
+      mk('✕', 'この枠を閉じる', () => { items = items.filter(x => x !== id); audioIds = audioIds.filter(x => x !== id); render(); }, 'close'));
+    const content = document.createElement('div'); content.className = 'content';
+
+    const foot = document.createElement('form'); foot.className = 'foot'; foot.autocomplete = 'off';
+    const ci = document.createElement('input'); ci.type = 'text'; ci.maxLength = 1000;
+    const cb = document.createElement('button'); cb.type = 'submit'; cb.textContent = '送信';
+    foot.append(ci, cb);
+    foot.addEventListener('submit', e => { e.preventDefault(); sendComment(id, ci, cb); });
+    // 日本語入力の確定のEnterでは送信しない
+    ci.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.isComposing || e.keyCode === 229)) e.preventDefault(); });
+
+    t.append(head, content, foot);
+
+    // ラベル/ヘッダの空き部分をつかんで動かすと並べ替え(5px以上動いたら開始)
+    head.addEventListener('mousedown', e => {
+      if (e.button !== 0 || e.target.closest('button, input')) return;
+      e.preventDefault();
+      const sx = e.screenX, sy = e.screenY; let started = false;
+      const move = ev => {
+        if (!started && Math.hypot(ev.screenX - sx, ev.screenY - sy) > 5) { started = true; window.mv.dragStart(id); }
+      };
+      const up = () => {
+        document.removeEventListener('mousemove', move, true); document.removeEventListener('mouseup', up, true);
+        if (started) window.mv.dragEnd();
+      };
+      document.addEventListener('mousemove', move, true); document.addEventListener('mouseup', up, true);
+    });
+    return t;
+  }
+
+  function render() {
+    const existing = new Map([...stage.children].map(t => [t.dataset.id, t]));
+    items.forEach((id, i) => {
+      let t = existing.get(id);
+      if (t) existing.delete(id); else t = makeTile(id);
+      if (stage.children[i] !== t) stage.insertBefore(t, stage.children[i] || null);
+      const s = t.querySelector('.snd'), on = audioIds.includes(id);
+      s.textContent = on ? '🔊' : '🔇'; s.classList.toggle('on', on);
+    });
+    existing.forEach(t => t.remove());
+    $('#muteAll').textContent = audioIds.length ? '全て消音' : '全て音声ON';
+    emptyEl.classList.toggle('show', items.length === 0);
+    layoutSel.value = layout;
+    document.body.classList.toggle('showCmt', showCmt);
+    updateTags();
+    renderAuth();
+    persist(); layoutNow();
+  }
+
+  function add(text) {
+    const ids = parseIds(text);
+    if (!ids.length) { say('lv番号が見つかりませんでした(例: lv123456789)', true); return; }
+    let added = 0, dup = 0, over = 0;
+    for (const id of ids) {
+      if (items.includes(id)) { dup++; continue; }
+      if (items.length >= MAX) { over++; continue; }
+      items.push(id); added++;
+      if (typeof volumes[id] !== 'number') volumes[id] = lastVol;
+    }
+    // 1枠だけ追加したときは、音声ONの枠がなければその枠をON。まとめて追加したときは全てミュートで始める
+    if (added === 1 && !audioIds.length) audioIds = [items[items.length - 1]];
+    render();
+    const p = [];
+    if (added) p.push(`${added}枠を追加しました`);
+    if (dup) p.push(`${dup}枠は追加済み`);
+    if (over) p.push(`${over}枠は上限(${MAX})のため追加できません`);
+    say(p.join(' / '), !added);
+  }
+
+  /* ---------- イベント ---------- */
+  $('#addForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const v = $('#addInput').value.trim();
+    if (!v) return;
+    if (parseIds(v).length) { add(v); $('#addInput').value = ''; closeSug(); }
+    else { clearTimeout(sgTimer); runSearch(v); }   // lv番号がなければ、放送者名などとして検索
+  });
+
+  /* ---------- 放送者名で検索 → 候補から追加 ---------- */
+  const addInput = $('#addInput');
+  let sgItems = [], sgIdx = -1, sgTimer = 0, sgSeq = 0, sgOpen = false, sgMsg = '';
+  // 検索候補は、映像と同じネイティブのビュー(メニュー)で、いちばん手前に出す。入力欄のフォーカスはそのまま
+  function sugPayload(scroll) { return Object.assign(menuData(), { sug: { msg: sgMsg, items: sgItems, idx: sgIdx, added: items.filter(id => sgItems.some(s => s.id === id)), scroll: !!scroll } }); }
+  function pushSug(scroll) {
+    if (!sgOpen) {
+      sgOpen = true; menuType = 'sug';
+      const r = $('#addForm').getBoundingClientRect();
+      window.mv.menuOpen('sug', { left: r.left, bottom: r.bottom, width: Math.max(r.width, 520) }, sugPayload(scroll));
+    } else window.mv.menuData(sugPayload(scroll));
+  }
+  function closeSug() {
+    clearTimeout(sgTimer); sgSeq++; sgItems = []; sgIdx = -1; sgMsg = '';
+    if (sgOpen) { sgOpen = false; if (menuType === 'sug') { menuType = ''; window.mv.menuClose(true); } }
+  }
+  function sugMsg(text) { sgMsg = text; sgItems = []; pushSug(); }
+  function markSug(scroll) { sgMsg = ''; pushSug(scroll); }
+  function renderSug() { sgMsg = ''; pushSug(); }
+  function pickSug(i) {
+    const it = sgItems[i]; if (!it) return;
+    if (items.includes(it.id)) { say(`${it.name || it.id} は追加済みです`); return; }
+    add(it.id);       // 追加後も候補は開いたままにして、続けて追加できる
+    markSug();
+  }
+  async function runSearch(q) {
+    const seq = ++sgSeq;
+    sugMsg('検索中…');
+    let r;
+    try { r = await window.mv.search(q); } catch { r = { ok: false }; }
+    if (seq !== sgSeq) return;   // 古い検索結果は捨てる
+    if (!r || !r.ok) { sgItems = []; sugMsg('検索できませんでした。しばらくしてからもう一度お試しください'); return; }
+    sgItems = r.items; sgIdx = sgItems.length ? 0 : -1;
+    if (!sgItems.length) sugMsg('放送者名が一致する放送中の枠が見つかりませんでした'); else renderSug();
+  }
+  addInput.addEventListener('input', () => {
+    const v = addInput.value.trim();
+    clearTimeout(sgTimer);
+    if (!v || parseIds(v).length || /nicovideo\.jp/i.test(v)) { closeSug(); return; }   // lv番号・URLなら検索しない
+    sgTimer = setTimeout(() => runSearch(v), 350);
+  });
+  addInput.addEventListener('keydown', e => {
+    if (e.isComposing || e.keyCode === 229) return;   // 日本語入力の確定中は何もしない
+    if (!sgOpen) return;
+    if (e.key === 'Escape') { e.preventDefault(); closeSug(); }
+    else if (sgItems.length && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      e.preventDefault(); sgIdx = (sgIdx + (e.key === 'ArrowDown' ? 1 : -1) + sgItems.length) % sgItems.length; markSug(true);
+    } else if (sgItems.length && e.key === 'Enter' && sgIdx >= 0) { e.preventDefault(); pickSug(sgIdx); }
+  });
+  document.addEventListener('mousedown', e => { if (sgOpen && e.target !== addInput) closeSug(); });
+  $('#addInput').addEventListener('paste', e => {
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    if (parseIds(text).length > 1) { e.preventDefault(); add(text); }
+  });
+  // ブラウザからリンクをドラッグして追加(枠の上=メイン側から届く / ツールバー・空き領域=ここで受ける)
+  window.mv.onAdd(t => add(t));
+  window.mv.onFocus(id => toggleFocus(id));
+  window.mv.onUnfocus(() => { if (focusId) toggleFocus(focusId); });
+  const linkDrag = e => e.dataTransfer && [...(e.dataTransfer.types || [])].some(t => /uri-list|moz-url|plain|html/.test(t));
+  document.addEventListener('dragover', e => { if (linkDrag(e)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
+  document.addEventListener('drop', e => {
+    if (!linkDrag(e)) return;
+    e.preventDefault();
+    const dt = e.dataTransfer, t = ['text/uri-list', 'text/x-moz-url', 'text/plain', 'text/html'].map(k => { try { return dt.getData(k); } catch { return ''; } }).join('\n');
+    if (parseIds(t).length) add(t); else say('放送のリンク(lv…)が見つかりませんでした', true);
+  });
+  layoutSel.addEventListener('change', () => { layout = layoutSel.value; render(); });
+  const poEl = $('#playerOnly'), scEl = $('#showCmt'), a184 = $('#use184');
+  poEl.addEventListener('change', () => { playerOnly = poEl.checked; render(); });
+  scEl.addEventListener('change', () => { showCmt = scEl.checked; render(); });
+  a184.addEventListener('change', () => { use184 = a184.checked; persist(); });
+  $('#muteAll').addEventListener('click', () => { audioIds = audioIds.length ? [] : items.slice(); render(); });
+  $('#fsBtn').addEventListener('click', () => window.mv.fullscreen());
+  window.mv.onFullscreen(on => { document.body.classList.toggle('fs', on); layoutNow(); setTimeout(layoutNow, 150); });
+  const themeSel = $('#theme');
+  themeSel.addEventListener('change', () => { theme = themeSel.value; window.mv.setTheme(theme); persist(); });
+  $('#viewerBtn').addEventListener('click', () => window.mv.openViewer());
+  $('#clearBtn').addEventListener('click', () => { items = []; audioIds = []; render(); });
+  $('#authBtn').addEventListener('click', () => {
+    if (loggedIn) { if (confirm('ニコニコからログアウトしますか?')) window.mv.logout(); }
+    else window.mv.login();
+  });
+  window.mv.onAuth(v => {
+    const was = loggedIn; loggedIn = v; renderAuth();
+    if (v && !was) say('ログインしました');
+    if (!v && was) say('ログアウトしました');
+  });
+  // 各枠のページから取得した放送者名・番組名を受け取ってラベルに反映
+  window.mv.onInfo((id, info) => {
+    if (!info || !info.name) return;
+    infos.set(id, { name: String(info.name), title: String(info.title || '') });
+    updateTags();
+  });
+
+  /* ---------- 枠のドラッグ並べ替え(位置の判定はメイン側から届く) ---------- */
+  let dragSrc = null, dragOver = null;
+  const tileAt = (x, y) => [...stage.children].find(t => {
+    const r = t.getBoundingClientRect(); return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+  });
+  function markOver(t) {
+    const id = t && t.dataset.id !== dragSrc ? t.dataset.id : null;
+    if (id === dragOver) return;
+    dragOver = id;
+    stage.querySelectorAll('.tile').forEach(x => x.classList.toggle('dragover', x.dataset.id === id));
+  }
+  window.mv.onDrag(d => {
+    if (d.type === 'start') {
+      dragSrc = d.id; dragOver = null;
+      document.body.classList.add('dragmode');
+      stage.querySelectorAll('.tile').forEach(t => {
+        t.querySelector('.content').dataset.label = nameOf(t.dataset.id);
+        t.classList.toggle('dragsrc', t.dataset.id === dragSrc);
+      });
+    } else if (d.type === 'pos') {
+      if (dragSrc) markOver(tileAt(d.x, d.y));
+    } else if (d.type === 'end') {
+      if (!dragSrc) return;
+      const target = tileAt(d.x, d.y), to = target && target.dataset.id;
+      const src = dragSrc; dragSrc = null; dragOver = null;
+      document.body.classList.remove('dragmode');
+      stage.querySelectorAll('.tile').forEach(t => t.classList.remove('dragover', 'dragsrc'));
+      if (to && to !== src && items.includes(src) && items.includes(to)) {
+        const next = items.filter(x => x !== src); next.splice(items.indexOf(to), 0, src); items = next;
+        render();
+      } else layoutNow();
+    }
+  });
+  // 万一マウスを離した通知が届かなかった場合は、動かした時点で終了させる
+  document.addEventListener('mousemove', e => { if (dragSrc && e.buttons === 0) window.mv.dragEnd(); }, true);
+  new ResizeObserver(layoutNow).observe(stage);
+  addEventListener('resize', layoutNow);
+
+  /* ---------- ギフトイベント: 上位者を自動表示 ---------- */
+  const evBtn = $('#evBtn');
+  const keyOf = t => { const m = String(t || '').match(/auditions\/([\w-]{1,80})/) || String(t || '').trim().match(/^([\w-]{1,80})$/); return m ? m[1] : ''; };
+  let evN = 4, menuType = '', pendingEv = null;
+  function savePreset(name) {
+    name = String(name || '').trim().slice(0, 40) || `保存 ${new Date().toLocaleString('ja-JP')}`;
+    presets = [{ name, items: [...items] }, ...presets.filter(p => p.name !== name)].slice(0, 30);
+    persist(); return name;
+  }
+  // メニュー(映像と同じネイティブのビューで、いちばん手前に出る)
+  function menuData() {
+    const names = {}; presets.forEach(p => p.items.forEach(id => { names[id] = nameOf(id); })); items.forEach(id => { names[id] = nameOf(id); });
+    return { presets, names, evKeys, evTrack, evN, dlgCount: items.length, dlgNames: items.map(nameOf) };
+  }
+  function openMenu(type, btn) {
+    const r = btn.getBoundingClientRect();
+    if (sgOpen) { sgOpen = false; clearTimeout(sgTimer); sgSeq++; }
+    menuType = type;
+    window.mv.menuOpen(type, { left: r.left, bottom: r.bottom }, menuData());
+  }
+  document.addEventListener('mousedown', e => { if (menuType && menuType !== 'sug' && !e.target.closest('#evBtn, #ppBtn')) window.mv.menuClose(); }, true);
+  window.mv.onMenuClosed(t => { if (menuType === t) menuType = ''; if (t === 'sug') sgOpen = false; });
+  window.mv.onMenuAct((action, p) => {
+    if (action === 'sug-hover') { sgIdx = Number(p); return; }
+    if (action === 'sug-pick') { pickSug(Number(p)); addInput.focus(); return; }
+    if (action === 'pp-save') {
+      if (!items.length) { say('保存する枠がありません', true); return; }
+      const n = savePreset(p); window.mv.menuData(menuData()); say(`「${n}」として保存しました`);
+    } else if (action === 'pp-open') {
+      const pr = presets[p]; if (!pr) return;
+      if (evTrack) stopTrack();
+      items = pr.items.filter(x => /^lv\d+$/.test(x)).slice(0, MAX); audioIds = [];
+      items.forEach(id => { if (typeof volumes[id] !== 'number') volumes[id] = lastVol; });
+      render(); say(`「${pr.name}」を開きました`);
+    } else if (action === 'pp-del') {
+      presets.splice(p, 1); persist(); window.mv.menuData(menuData());
+    } else if (action === 'ev-key') {
+      const k = keyOf(p); if (!k) { say('キーを読み取れませんでした', true); return; }
+      if (!evKeys.includes(k)) evKeys = [k, ...evKeys].slice(0, 20);
+      persist(); window.mv.menuData(menuData());
+    } else if (action === 'ev-track') {
+      evN = Number(p.n) || 4; startTrack(p.event);
+    } else if (action === 'dlg-save') {
+      if (!pendingEv) return; const n = savePreset(p); say(`「${n}」として保存しました`); const e = pendingEv; pendingEv = null; doTrack(e);
+    } else if (action === 'dlg-no') {
+      if (!pendingEv) return; const e = pendingEv; pendingEv = null; doTrack(e);
+    } else if (action === 'dlg-cancel') { pendingEv = null; }
+  });
+  function renderChip() {
+    $('#evChip').classList.toggle('show', !!evTrack);
+    $('#evChipT').textContent = evTrack ? `🎁 ${evTrack.title} 上位${evTrack.n}` : '';
+    evBtn.classList.toggle('on', !!evTrack);
+  }
+  function startTrack(e) {
+    if (items.length) {
+      pendingEv = e;
+      setTimeout(() => openMenu('dlg', evBtn), 350); return;
+    }
+    doTrack(e);
+  }
+  function doTrack(e) {
+    evGen++; evBusy = false;
+    items = []; audioIds = []; evLvs = []; ranks.clear(); focusId = '';
+    layout = 'auto';   // ギフト表示は自動グリッド
+    evTrack = { key: e.key, title: e.title, n: Number(evN) || 4 };
+    evSig = null; render(); renderChip(); persist(); refreshTop(true); clearInterval(evTimer); evTimer = setInterval(() => refreshTop(false), 60000);
+  }
+  function stopTrack() {
+    evGen++; evBusy = false;
+    evTrack = null; clearInterval(evTimer); evSig = ''; ranks.clear(); evLvs = []; renderChip(); persist(); updateTags();
+  }
+  async function refreshTop(first) {
+    if (!evTrack || evBusy) return;
+    evBusy = true;
+    const gen = evGen;
+    let r; try { r = await window.mv.evTop(evTrack.key, evTrack.n); } catch { r = null; }
+    if (gen !== evGen) return;   // 追跡を切り替えた後に返ってきた古い結果は捨てる
+    evBusy = false;
+    if (!evTrack) return;
+    if (!r || !r.ok) { if (first) say('順位を取得できませんでした(イベントが終了した可能性があります)', true); return; }
+    const live = r.top.filter(x => x.lv);
+    // 順位の並び(放送中の人だけ)が変わったときだけ、枠を入れ替える
+    const sig = live.map(x => x.lv).join(',');
+    ranks.clear(); live.forEach(x => ranks.set(x.lv, { rank: x.rank, score: x.score, sm: x.sm }));
+    if (sig !== evSig) {
+      evSig = sig;
+      const want = live.map(x => x.lv);
+      const manual = items.filter(id => !evLvs.includes(id) && !want.includes(id));
+      const next = [...want, ...manual].slice(0, MAX);
+      next.forEach(id => { if (typeof volumes[id] !== 'number') volumes[id] = lastVol; });
+      evLvs.filter(id => !want.includes(id)).forEach(id => { audioIds = audioIds.filter(x => x !== id); });
+      evLvs = want; items = next;
+      render();
+    } else updateTags();
+    const off = r.top.filter(x => !x.lv).map(x => `${x.rank}位 ${x.name}`);
+    if (first && off.length) say((live.length ? '' : '上位者で放送中の人がいません / ') + `放送なし: ${off.join('、')}`, !live.length);
+  }
+  evBtn.addEventListener('click', () => openMenu('ev', evBtn));
+  $('#ppBtn').addEventListener('click', () => openMenu('pp', $('#ppBtn')));
+  $('#evStop').addEventListener('click', stopTrack);
+
+  /* ---------- 起動時 ---------- */
+  Promise.all([window.mv.load(), window.mv.auth()]).then(([s, a]) => {
+    loggedIn = !!a;
+    if (s && Array.isArray(s.items)) {
+      items = s.items.filter(x => /^lv\d+$/.test(x)).slice(0, MAX);
+      layout = ['auto', 'main', 'row', 'col'].includes(s.layout) ? s.layout : 'auto';
+      if (Array.isArray(s.audioIds)) audioIds = s.audioIds.filter(x => items.includes(x));
+      else audioIds = items.includes(s.audioId) ? [s.audioId] : (items[0] ? [items[0]] : []);   // 旧形式の保存データ
+      if (typeof s.playerOnly === 'boolean') playerOnly = s.playerOnly;
+      if (typeof s.showCmt === 'boolean') showCmt = s.showCmt;
+      if (typeof s.use184 === 'boolean') use184 = s.use184;
+      if (['system', 'light', 'dark'].includes(s.theme)) theme = s.theme;
+      if (s.volumes && typeof s.volumes === 'object') for (const [k, v] of Object.entries(s.volumes)) if (/^lv\d+$/.test(k) && Number.isFinite(Number(v))) volumes[k] = Math.min(1, Math.max(0, Number(v)));
+      if (s.hideCmts && typeof s.hideCmts === 'object') for (const [k, v] of Object.entries(s.hideCmts)) if (/^lv\d+$/.test(k) && v === true) hideCmts[k] = true;
+      if (Number.isFinite(Number(s.lastVol))) lastVol = Math.min(1, Math.max(0, Number(s.lastVol)));
+      items.forEach(id => { if (typeof volumes[id] !== 'number') volumes[id] = lastVol; });
+    }
+    themeSel.value = theme;
+    poEl.checked = playerOnly; scEl.checked = showCmt; a184.checked = use184;
+    if (s && Array.isArray(s.presets)) presets = s.presets.filter(p => p && typeof p.name === 'string' && Array.isArray(p.items)).map(p => ({ name: p.name.slice(0, 40), items: p.items.filter(x => /^lv\d+$/.test(x)).slice(0, MAX) })).slice(0, 30);
+    if (s && Array.isArray(s.evKeys)) evKeys = s.evKeys.filter(k => /^[\w-]{1,80}$/.test(String(k))).slice(0, 20);
+    if (s && s.evTrack && /^[\w-]{1,80}$/.test(String(s.evTrack.key))) {
+      evTrack = { key: s.evTrack.key, title: String(s.evTrack.title || '').slice(0, 100), n: Math.min(12, Math.max(1, Number(s.evTrack.n) || 4)) };
+      evN = evTrack.n; evTimer = setInterval(() => refreshTop(false), 60000);
+    }
+    render(); renderChip();
+    if (evTrack) refreshTop(true);
+  });
+})();
+</script>
+</body>
+</html>

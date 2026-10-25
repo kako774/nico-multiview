@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>統合コメントビューア</title>
+<style>
+:root{
+  --bg:#0f1115;--panel:#181b22;--line:#2a2f3a;--text:#e8eaf0;--sub:#9aa3b2;--accent:#4da3ff;--danger:#ff6b6b;--ok:#5fd38d;
+  --input:#0c0e12;--btn:#232834;--btnhv:#44507a;--onaccent:#06121f;--tilebg:#05070a;--stagebg:#000;--tagbg:#000a;
+  --hl:#1d3a5c;--dragbg:#0b0e14;--dragon:#14263d;--chip:#161a22;--hover:#ffffff0a;--rowline:#ffffff08;
+  --c0:#4da3ff;--c1:#ff8a5c;--c2:#5fd38d;--c3:#e0b341;--c4:#c78bff;--c5:#ff6fa8;--c6:#4fd1d9;--c7:#a3b86c;
+  color-scheme:dark;
+  --fs:14px;
+}
+@media (prefers-color-scheme: light){
+  :root{
+    --bg:#f4f6fa;--panel:#ffffff;--line:#d3d9e3;--text:#1a1f2b;--sub:#5b6577;--accent:#1a73e8;--danger:#d93025;--ok:#188038;
+    --input:#ffffff;--btn:#eef1f6;--btnhv:#9db4dc;--onaccent:#ffffff;--tilebg:#dfe4ec;--stagebg:#e6eaf1;--tagbg:#ffffffd9;
+    --hl:#cfe0fb;--dragbg:#e3e8f0;--dragon:#cfe0fb;--chip:#f0f3f8;--hover:#0000000a;--rowline:#00000010;
+    --c0:#1a73e8;--c1:#d9531e;--c2:#188038;--c3:#9a6b00;--c4:#8a3ffc;--c5:#c2185b;--c6:#00838f;--c7:#5d6f1f;
+    color-scheme:light;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font-family:"Noto Sans JP","Yu Gothic UI","Meiryo","Hiragino Sans",sans-serif;font-size:14px}
+body{display:flex;flex-direction:column;overflow:hidden}
+#bar{flex:0 0 auto;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line)}
+button{font:inherit;font-size:12px;color:var(--text);background:var(--btn);border:1px solid var(--line);border-radius:6px;padding:3px 9px;cursor:pointer}
+button:hover{border-color:var(--btnhv)}
+input[type=text]{flex:1;min-width:90px;padding:4px 8px;border-radius:6px;border:1px solid var(--line);background:var(--input);color:var(--text);font:inherit;font-size:12px}
+input[type=text]:focus{outline:2px solid var(--accent)}
+.chk{display:flex;align-items:center;gap:4px;color:var(--sub);font-size:12px;cursor:pointer;white-space:nowrap}
+#chips{flex:0 0 auto;display:flex;flex-wrap:wrap;gap:5px;padding:6px 8px;border-bottom:1px solid var(--line);min-height:34px}
+.chip{display:flex;align-items:center;gap:5px;font-size:12px;padding:2px 9px;border-radius:999px;border:1px solid var(--line);background:var(--chip);cursor:pointer;user-select:none;max-width:100%}
+.chip i{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+.chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip.off{opacity:.4;text-decoration:line-through}
+#list{flex:1 1 auto;min-height:0;overflow-y:auto;padding:4px 0}
+.line{display:flex;gap:7px;align-items:baseline;padding:3px 10px;font-size:var(--fs);line-height:1.45;border-bottom:1px solid var(--rowline)}
+.line:hover{background:var(--hover)}
+.line.hide{display:none}
+.t{flex:0 0 auto;color:var(--sub);font-size:.8em;font-variant-numeric:tabular-nums}
+.n{flex:0 0 auto;font-size:.8em;font-weight:700;max-width:7.5em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.x{flex:1 1 auto;min-width:0;word-break:break-all;user-select:text}
+#empty{color:var(--sub);text-align:center;padding:36px 16px;line-height:1.9}
+#latest{position:absolute;right:14px;bottom:14px;display:none;background:var(--accent);border-color:var(--accent);color:var(--onaccent);font-weight:700;padding:5px 12px;border-radius:999px}
+#wrap{position:relative;flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+</style>
+</head>
+<body>
+<div id="bar">
+  <input id="q" type="text" placeholder="コメントを検索" aria-label="コメントを検索">
+  <button id="fm" type="button" title="文字を小さく">A−</button>
+  <button id="fp" type="button" title="文字を大きく">A＋</button>
+  <label class="chk"><input id="top" type="checkbox">最前面</label>
+  <button id="clr" type="button">クリア</button>
+</div>
+<div id="chips" aria-label="表示する放送"></div>
+<div id="wrap">
+  <div id="list"><div id="empty">コメントを待っています…<br>メインの画面で放送を追加すると、全枠のコメントがここに集まります</div></div>
+  <button id="latest" type="button">↓ 最新へ</button>
+</div>
+<script>
+(() => {
+  'use strict';
+  const $ = s => document.querySelector(s);
+  const list = $('#list'), chips = $('#chips'), latest = $('#latest');
+  const MAXLINES = 1500;
+  const colorOf = new Map(), names = new Map(), hidden = new Set();
+  let query = '';
+
+  const color = id => { if (!colorOf.has(id)) colorOf.set(id, `var(--c${colorOf.size % 8})`); return colorOf.get(id); };
+  const nameOf = id => names.get(id) || id;
+  const hhmmss = t => { const d = new Date(t), p = n => String(n).padStart(2, '0'); return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; };
+  const atBottom = () => list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+  const matches = (el) => !hidden.has(el.dataset.src) && (!query || el.dataset.text.includes(query));
+  const applyFilter = el => el.classList.toggle('hide', !matches(el));
+
+  function renderChips() {
+    chips.textContent = '';
+    for (const [id] of colorOf) {
+      const c = document.createElement('div'); c.className = 'chip' + (hidden.has(id) ? ' off' : ''); c.title = id + '(クリックで表示/非表示)';
+      const dot = document.createElement('i'); dot.style.background = color(id);
+      const nm = document.createElement('span'); nm.textContent = nameOf(id);
+      c.append(dot, nm);
+      c.addEventListener('click', () => { hidden.has(id) ? hidden.delete(id) : hidden.add(id); renderChips(); refilter(); });
+      chips.appendChild(c);
+    }
+  }
+  function refilter() {
+    const stick = atBottom();
+    list.querySelectorAll('.line').forEach(applyFilter);
+    if (stick) list.scrollTop = list.scrollHeight;
+  }
+  function refreshNames() {
+    list.querySelectorAll('.line').forEach(l => { l.querySelector('.n').textContent = nameOf(l.dataset.src); });
+  }
+
+  function add(items) {
+    if (!items.length) return;
+    const stick = atBottom();
+    const e = $('#empty'); if (e) e.remove();
+    const frag = document.createDocumentFragment();
+    let newSrc = false;
+    for (const it of items) {
+      if (!colorOf.has(it.id)) newSrc = true;
+      const l = document.createElement('div'); l.className = 'line'; l.dataset.src = it.id; l.dataset.text = it.text.toLowerCase();
+      const t = document.createElement('span'); t.className = 't'; t.textContent = hhmmss(it.t);
+      const n = document.createElement('span'); n.className = 'n'; n.style.color = color(it.id); n.textContent = nameOf(it.id); n.title = it.id;
+      const x = document.createElement('span'); x.className = 'x'; x.textContent = it.text;
+      l.append(t, n, x); applyFilter(l); frag.appendChild(l);
+    }
+    list.appendChild(frag);
+    while (list.childElementCount > MAXLINES) list.firstElementChild.remove();
+    if (newSrc) renderChips();
+    if (stick) list.scrollTop = list.scrollHeight; else latest.style.display = 'block';
+  }
+
+  list.addEventListener('scroll', () => { latest.style.display = atBottom() ? 'none' : 'block'; });
+  latest.addEventListener('click', () => { list.scrollTop = list.scrollHeight; });
+  $('#q').addEventListener('input', e => { query = e.target.value.trim().toLowerCase(); refilter(); });
+  $('#clr').addEventListener('click', () => { list.textContent = ''; window.vw.clear(); });
+  $('#top').addEventListener('change', e => window.vw.onTop(e.target.checked));
+  let fs = 14;
+  try { fs = Number(localStorage.getItem('vw.fs')) || 14; } catch (e) {}
+  const setFs = v => { fs = Math.max(10, Math.min(30, v)); document.documentElement.style.setProperty('--fs', fs + 'px'); try { localStorage.setItem('vw.fs', fs); } catch (e) {} };
+  setFs(fs);
+  $('#fm').addEventListener('click', () => setFs(fs - 1));
+  $('#fp').addEventListener('click', () => setFs(fs + 1));
+
+  window.vw.onSources(src => {
+    (src || []).forEach(s => { names.set(s.id, s.name); color(s.id); });
+    renderChips(); refreshNames();
+  });
+  window.vw.onComments(items => add(items));
+  window.vw.init().then(({ backlog, sources }) => {
+    (sources || []).forEach(s => { names.set(s.id, s.name); color(s.id); });
+    renderChips(); add(backlog || []); list.scrollTop = list.scrollHeight;
+  });
+})();
+</script>
+</body>
+</html>

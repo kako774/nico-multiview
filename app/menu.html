@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>menu</title>
+<style>
+:root{
+  --bg:#0f1115;--panel:#181b22;--line:#2a2f3a;--text:#e8eaf0;--sub:#9aa3b2;--accent:#4da3ff;--danger:#ff6b6b;--ok:#5fd38d;
+  --input:#0c0e12;--btn:#232834;--btnhv:#44507a;--onaccent:#06121f;--tilebg:#05070a;--stagebg:#000;--tagbg:#000a;
+  --hl:#1d3a5c;--dragbg:#0b0e14;--dragon:#14263d;--chip:#161a22;--hover:#ffffff0a;--rowline:#ffffff08;
+  --c0:#4da3ff;--c1:#ff8a5c;--c2:#5fd38d;--c3:#e0b341;--c4:#c78bff;--c5:#ff6fa8;--c6:#4fd1d9;--c7:#a3b86c;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){
+  :root{
+    --bg:#f4f6fa;--panel:#ffffff;--line:#d3d9e3;--text:#1a1f2b;--sub:#5b6577;--accent:#1a73e8;--danger:#d93025;--ok:#188038;
+    --input:#ffffff;--btn:#eef1f6;--btnhv:#9db4dc;--onaccent:#ffffff;--tilebg:#dfe4ec;--stagebg:#e6eaf1;--tagbg:#ffffffd9;
+    --hl:#cfe0fb;--dragbg:#e3e8f0;--dragon:#cfe0fb;--chip:#f0f3f8;--hover:#0000000a;--rowline:#00000010;
+    --c0:#1a73e8;--c1:#d9531e;--c2:#188038;--c3:#9a6b00;--c4:#8a3ffc;--c5:#c2185b;--c6:#00838f;--c7:#5d6f1f;
+    color-scheme:light;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--panel);color:var(--text);font-family:"Noto Sans JP","Yu Gothic UI","Meiryo","Hiragino Sans",sans-serif;font-size:14px;overflow:hidden}
+body{border:1px solid var(--line);border-radius:8px}
+#root{padding:12px;max-height:100vh;overflow:auto}
+h2{margin:0 0 8px;font-size:15px}
+.hint{font-size:12px;color:var(--sub)}
+input[type=text]{min-width:0;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--input);color:var(--text);font:inherit}
+input[type=text]:focus{outline:2px solid var(--accent)}
+button,select{font:inherit;color:var(--text);background:var(--btn);border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer}
+button:hover,select:hover{border-color:var(--btnhv)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}
+.row input[type=text]{flex:1;min-width:160px}
+.sgmsg{padding:14px;color:var(--sub);text-align:center;font-size:13px}
+.evi{display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin:6px 0;cursor:pointer}
+.evi:hover,.evi.on{background:var(--hl)}
+.evi .k{font-size:11px;color:var(--sub);font-weight:400}
+.evi .t{flex:1;min-width:0;font-weight:700;font-size:13px}
+.sg{display:flex;gap:10px;align-items:center;padding:7px 10px;cursor:pointer;border-bottom:1px solid var(--line)}
+.sg:last-child{border-bottom:0}
+.sg.on{background:var(--hl)}
+.sg img{width:80px;height:45px;object-fit:cover;border-radius:4px;background:var(--tilebg);flex:0 0 auto}
+.sg .tx{min-width:0;flex:1}
+.sg .nm{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sg .tt{font-size:12px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sg .mt{font-size:11px;color:var(--sub)}
+.sg .ad{font-size:12px;color:var(--ok);flex:0 0 auto;display:none}
+.sg.added .ad{display:block}
+body.sugmode #root{padding:0}
+</style></head><body><div id="root"></div>
+<script>
+(() => {
+  'use strict';
+  const root = document.getElementById('root');
+  let type = '', data = {}, seq = 0;
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+  const btn = (label, fn, title) => { const b = el('button', '', label); b.type = 'button'; if (title) b.title = title; b.addEventListener('click', fn); return b; };
+  const fmtEnd = sec => { const d = new Date(sec * 1000); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+  const keyOf = t => { const m = String(t || '').match(/auditions\/([\w-]{1,80})/) || String(t || '').trim().match(/^([\w-]{1,80})$/); return m ? m[1] : ''; };
+  const report = () => requestAnimationFrame(() => window.menu.size(root.scrollHeight + 2));
+  const textInput = ph => { const i = el('input'); i.type = 'text'; i.placeholder = ph; i.autocomplete = 'off'; return i; };
+
+  /* ---- 枠の保存 ---- */
+  let ppDraft = '';
+  function renderPP() {
+    root.textContent = '';
+    root.appendChild(el('h2', '', '📁 枠の保存'));
+    const row = el('div', 'row'), name = textInput('保存名'); name.value = ppDraft; name.addEventListener('input', () => { ppDraft = name.value; });
+    const save = () => { window.menu.act('pp-save', name.value, true); ppDraft = ''; };
+    name.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) save(); });
+    row.append(name, btn('いまの枠を保存', save), btn('閉じる', () => window.menu.close()));
+    root.appendChild(row);
+    const L = el('div');
+    if (!data.presets || !data.presets.length) L.appendChild(el('div', 'sgmsg', '保存した枠はまだありません'));
+    (data.presets || []).forEach((p, i) => {
+      const d = el('div', 'evi'), t = el('div', 't', p.name);
+      t.appendChild(el('div', 'k', `${p.items.length}枠: ` + p.items.map(id => (data.names && data.names[id]) || id).join('、')));
+      d.append(t, btn('開く', e => { e.stopPropagation(); window.menu.act('pp-open', i); }), btn('削除', e => { e.stopPropagation(); window.menu.act('pp-del', i, true); }));
+      L.appendChild(d);
+    });
+    root.appendChild(L); report();
+  }
+
+  /* ---- ギフトイベント ---- */
+  let evN = 4, evKeyDraft = '';
+  async function renderEV() {
+    const my = ++seq;
+    evN = data.evN || evN;
+    root.textContent = '';
+    root.appendChild(el('h2', '', '🎁 ギフトイベントの上位者を自動表示'));
+    root.appendChild(el('div', 'hint', '開催中のイベントを選ぶと、上位者のうち「いま放送中」の人の枠を順位順に並べ、順位が変わると枠も自動で入れ替わります(1分ごとに更新)。'));
+    const row = el('div', 'row'), sel = el('select');
+    for (let i = 1; i <= 12; i++) sel.add(new Option(String(i), String(i)));
+    sel.value = String(evN); sel.addEventListener('change', () => { evN = Number(sel.value) || 4; });
+    const lab = el('label'); lab.append('表示する順位 上位 ', sel, ' 位まで');
+    row.append(lab, btn('一覧を更新', renderEV), btn('閉じる', () => window.menu.close()));
+    root.appendChild(row);
+    const kr = el('div', 'row'), key = textInput('一覧にないイベント: キー or audition.nicovideo.jp のURL'); key.value = evKeyDraft; key.addEventListener('input', () => { evKeyDraft = key.value; });
+    const addKey = () => { const k = keyOf(key.value); if (!k) return; evKeyDraft = ''; window.menu.act('ev-key', k, true); };
+    key.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) addKey(); });
+    kr.append(key, btn('追加', addKey)); root.appendChild(kr);
+    const L = el('div'); L.appendChild(el('div', 'sgmsg', '開催中のイベントを探しています…')); root.appendChild(L); report();
+    let r; try { r = await window.menu.evList(data.evKeys || []); } catch { r = null; }
+    if (my !== seq) return;
+    L.textContent = '';
+    if (!r || !r.ok || !r.events.length) { L.appendChild(el('div', 'sgmsg', 'イベントが見つかりませんでした。上の欄にキー/URLを貼ると追加できます。')); report(); return; }
+    r.events.forEach(e => {
+      const d = el('div', 'evi' + (data.evTrack && data.evTrack.key === e.key ? ' on' : '')), t = el('div', 't', e.title);
+      t.appendChild(el('div', 'k', (e.kind === 'gift' ? '🎁 ギフト' : e.kind === 'ad' ? '📣 ニコニ広告' : '🏆 イベント') + ` / 〜${fmtEnd(e.end)}` + (e.entries ? ` / 参加${e.entries}人` : '')));
+      d.append(t, btn('追跡開始', () => {}));
+      d.addEventListener('click', () => window.menu.act('ev-track', { event: e, n: evN }));
+      L.appendChild(d);
+    });
+    report();
+  }
+
+  /* ---- 追跡開始の確認 ---- */
+  let dlgDraft = '';
+  function renderDLG() {
+    root.textContent = '';
+    root.appendChild(el('h2', '', '今開いている枠を閉じて追跡を始めます'));
+    const names = data.dlgNames || [];
+    root.appendChild(el('div', 'hint', `いま開いている ${data.dlgCount || 0} 枠(${names.slice(0, 4).join('、')}${(data.dlgCount || 0) > 4 ? ' ほか' : ''})はすべて閉じます。保存しますか?`));
+    const name = textInput('保存名(例: いつもの枠)'); name.value = dlgDraft; name.addEventListener('input', () => { dlgDraft = name.value; });
+    const r1 = el('div', 'row'); r1.appendChild(name); root.appendChild(r1);
+    const go = (a) => { const v = name.value; dlgDraft = ''; window.menu.act(a, v); };
+    const r2 = el('div', 'row'); r2.append(btn('保存して開始', () => go('dlg-save')), btn('保存せずに開始', () => go('dlg-no')), btn('キャンセル', () => go('dlg-cancel')));
+    root.appendChild(r2); report();
+  }
+
+  /* ---- 検索候補(入力欄は本体側。ここは表示と選択だけ) ---- */
+  function renderSUG() {
+    const keep = root.scrollTop; root.textContent = '';
+    const s = data.sug || {};
+    if (s.msg) { root.appendChild(el('div', 'sgmsg', s.msg)); report(); return; }
+    (s.items || []).forEach((it, i) => {
+      const row = el('div', 'sg' + (i === s.idx ? ' on' : '') + ((s.added || []).includes(it.id) ? ' added' : ''));
+      const img = el('img'); img.alt = ''; if (it.thumb) img.src = it.thumb;
+      const tx = el('div', 'tx');
+      tx.append(el('div', 'nm', it.name || it.id), el('div', 'tt', it.title), el('div', 'mt', `${it.id} ・ 来場 ${Number(it.watch).toLocaleString('ja-JP')}${it.type === 'channel' ? ' ・ チャンネル' : it.type === 'official' ? ' ・ 公式' : ''}`));
+      row.append(img, tx, el('div', 'ad', '✓ 追加済み'));
+      row.addEventListener('mousedown', e => e.preventDefault());
+      row.addEventListener('mouseenter', () => { root.querySelectorAll('.sg').forEach((r, j) => r.classList.toggle('on', j === i)); window.menu.act('sug-hover', i, true); });
+      row.addEventListener('click', () => window.menu.act('sug-pick', i, true));
+      root.appendChild(row);
+    });
+    root.scrollTop = keep;
+    const on = root.querySelector('.sg.on'); if (on && s.scroll) on.scrollIntoView({ block: 'nearest' });
+    report();
+  }
+
+  function render() { seq++; document.body.classList.toggle('sugmode', type === 'sug'); if (type === 'sug') renderSUG(); else if (type === 'pp') renderPP(); else if (type === 'ev') renderEV(); else if (type === 'dlg') renderDLG(); }
+  window.menu.onShow((t, d) => { type = t; data = d || {}; render(); });
+  // 保存・追加などで内容が変わったとき(イベント一覧は取り直さない)
+  window.menu.onData(d => { data = d || {}; if (type === 'sug') renderSUG(); else if (type === 'pp') renderPP(); else if (type === 'ev') { evN = data.evN || evN; renderEV(); } });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') window.menu.close(); });
+})();
+</script></body></html>

@@ -1,0 +1,50 @@
+{
+  "name": "nico-multiview",
+  "productName": "ニコ生マルチビュー",
+  "version": "1.0.0",
+  "description": "ニコニコ生放送を複数枠まとめて同時視聴するデスクトップアプリ",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win portable"
+  },
+  "build": {
+    "appId": "dev.nico-multiview",
+    "productName": "NicoMultiView",
+    "files": [
+      "main.js",
+      "preload.js",
+      "view-preload.js",
+      "viewer-preload.js",
+      "ui.html",
+      "viewer.html",
+      "menu.html",
+      "menu-preload.js",
+      "exit-preload.js",
+      "icon.png",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false,
+      "icon": "icon.ico"
+    },
+    "electronLanguages": ["ja", "en-US"],
+    "artifactName": "NicoMultiView.exe",
+    "directories": {
+      "output": "dist"
+    }
+  },
+  "devDependencies": {
+    "electron": "^45.0.0",
+    "electron-builder": "^26.18.0"
+  }
+}

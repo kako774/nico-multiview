@@ -38,7 +38,12 @@ button:hover:not(:disabled),select:hover{border-color:var(--btnhv)}
 button:disabled{opacity:.5;cursor:default}
 button.primary{background:var(--accent);border-color:var(--accent);color:var(--onaccent);font-weight:700}
 .chk{display:flex;align-items:center;gap:5px;color:var(--sub);cursor:pointer;white-space:nowrap}
-#auth{display:flex;align-items:center;gap:8px;margin-left:auto}
+#setBtn{margin-left:auto}
+#setPanel{display:none}
+.srow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0}
+.srow+.srow{border-top:1px solid var(--line)}
+.srow label{color:var(--text)}
+.srow.ver{justify-content:flex-end;font-size:12px;color:var(--sub)}
 #authState{font-size:12px;color:var(--sub);white-space:nowrap}
 #authState.in{color:var(--ok)}
 #evBtn.on{background:var(--btnhv)}
@@ -122,12 +127,6 @@ body.showCmt .foot{display:flex}
     <option value="row">横一列</option>
     <option value="col">縦一列</option>
   </select>
-  <select id="theme" aria-label="テーマ" title="画面の明るさ">
-    <option value="system">テーマ: 自動</option>
-    <option value="light">ライト</option>
-    <option value="dark">ダーク</option>
-  </select>
-  <label class="chk" title="OFFにすると視聴ページ全体を表示します"><input id="playerOnly" type="checkbox" checked>プレイヤーのみ</label>
   <label class="chk" title="各枠の下にコメント入力欄を出します"><input id="showCmt" type="checkbox" checked>コメント欄</label>
   <label class="chk" title="184(投稿者を表示しない)でコメントします"><input id="use184" type="checkbox">184</label>
   <button id="muteAll" type="button" title="全枠の音声を一括でOFF / ON">全て消音</button>
@@ -138,11 +137,18 @@ body.showCmt .foot{display:flex}
   <div id="evChip"><span id="evChipT"></span><button id="evStop" type="button" title="追跡をやめる(枠はそのまま残ります)">✕</button></div>
   <button id="viewerBtn" type="button" title="全枠のコメントをまとめて表示する別窓を開く">コメントビューア</button>
   <button id="clearBtn" type="button">全部閉じる</button>
-  <div id="auth">
-    <span id="authState">未ログイン</span>
-    <button id="authBtn" type="button">ニコニコにログイン</button>
-  </div>
+  <button id="setBtn" type="button" title="テーマ・プレイヤーのみ・ログイン">⚙ 設定</button>
   <div id="msg" role="status"></div>
+</div>
+<div id="setPanel" hidden>
+  <div class="srow"><label for="theme">テーマ</label>
+    <select id="theme" aria-label="テーマ" title="画面の明るさ">
+      <option value="system">自動</option><option value="light">ライト</option><option value="dark">ダーク</option>
+    </select></div>
+  <div class="srow"><label for="playerOnly">プレイヤーのみ</label>
+    <input id="playerOnly" type="checkbox" checked title="OFFにすると視聴ページ全体を表示します"></div>
+  <div class="srow"><span id="authState">未ログイン</span><button id="authBtn" type="button">ニコニコにログイン</button></div>
+  <div class="srow ver"><span id="verText">バージョン</span></div>
 </div>
 <div id="wrap">
   <div id="stage"></div>
@@ -189,6 +195,7 @@ body.showCmt .foot{display:flex}
     $('#authState').textContent = loggedIn ? 'ログイン中' : '未ログイン';
     $('#authState').className = loggedIn ? 'in' : '';
     $('#authBtn').textContent = loggedIn ? 'ログアウト' : 'ニコニコにログイン';
+    if (menuType === 'set') window.mv.menuData(menuData());
     document.querySelectorAll('.foot').forEach(f => {
       const i = f.querySelector('input'), b = f.querySelector('button');
       i.disabled = b.disabled = !loggedIn;
@@ -479,6 +486,18 @@ body.showCmt .foot{display:flex}
   window.mv.onClean(on => setClean(on));
   document.addEventListener('keydown', e => { if (e.key === 'F10') { e.preventDefault(); setClean(!cleanMode); } });
   window.mv.onFullscreen(on => { document.body.classList.toggle('fs', on); layoutNow(); setTimeout(layoutNow, 150); });
+  /* ---------- 設定(メニューは、映像と同じネイティブのビューで開く。値は、見えない設定部品が持つ) ---------- */
+  const setBtn = $('#setBtn');
+  let appVersion = '', updateInfo = null;
+  const checkUpdate = () => window.mv.updateCheck().then(r => {
+    updateInfo = r && r.ok && r.newer ? { latest: r.latest } : null;
+    setBtn.textContent = updateInfo ? '⚙ 設定 🔔' : '⚙ 設定';
+    setBtn.title = updateInfo ? `新しいバージョン v${updateInfo.latest} があります` : 'テーマ・プレイヤーのみ・ログイン';
+    if (menuType === 'set') window.mv.menuData(menuData());
+  }).catch(() => {});
+  setTimeout(checkUpdate, 3000); setInterval(checkUpdate, 6 * 3600 * 1000);
+  setBtn.addEventListener('click', () => openMenu('set', setBtn));
+  window.mv.version().then(v => { appVersion = v; }).catch(() => {});
   const themeSel = $('#theme');
   themeSel.addEventListener('change', () => { theme = themeSel.value; window.mv.setTheme(theme); persist(); });
   $('#viewerBtn').addEventListener('click', () => window.mv.openViewer());
@@ -549,17 +568,27 @@ body.showCmt .foot{display:flex}
   // メニュー(映像と同じネイティブのビューで、いちばん手前に出る)
   function menuData() {
     const names = {}; presets.forEach(p => p.items.forEach(id => { names[id] = nameOf(id); })); items.forEach(id => { names[id] = nameOf(id); });
-    return { presets, names, evKeys, evTrack, evN, dlgCount: items.length, dlgNames: items.map(nameOf) };
+    return { theme, playerOnly, loggedIn, appVersion, update: updateInfo, presets, names, evKeys, evTrack, evN, dlgCount: items.length, dlgNames: items.map(nameOf) };
   }
   function openMenu(type, btn) {
     const r = btn.getBoundingClientRect();
+    if (type === 'set') {   // 設定は、ボタンの右端にそろえて開く
+      if (sgOpen) { sgOpen = false; clearTimeout(sgTimer); sgSeq++; }
+      menuType = type;
+      window.mv.menuOpen(type, { left: r.right - 300, bottom: r.bottom, width: 300 }, menuData());
+      return;
+    }
     if (sgOpen) { sgOpen = false; clearTimeout(sgTimer); sgSeq++; }
     menuType = type;
     window.mv.menuOpen(type, { left: r.left, bottom: r.bottom }, menuData());
   }
-  document.addEventListener('mousedown', e => { if (menuType && menuType !== 'sug' && !e.target.closest('#evBtn, #ppBtn')) window.mv.menuClose(); }, true);
+  document.addEventListener('mousedown', e => { if (menuType && menuType !== 'sug' && !e.target.closest('#evBtn, #ppBtn, #setBtn')) window.mv.menuClose(); }, true);
   window.mv.onMenuClosed(t => { if (menuType === t) menuType = ''; if (t === 'sug') sgOpen = false; });
   window.mv.onMenuAct((action, p) => {
+    if (action === 'set-theme') { themeSel.value = String(p); themeSel.dispatchEvent(new Event('change')); window.mv.menuData(menuData()); return; }
+    if (action === 'set-po') { poEl.checked = !!p; poEl.dispatchEvent(new Event('change')); window.mv.menuData(menuData()); return; }
+    if (action === 'set-update') { window.mv.openRelease(); return; }
+    if (action === 'set-auth') { $('#authBtn').click(); return; }
     if (action === 'sug-hover') { sgIdx = Number(p); return; }
     if (action === 'sug-pick') { pickSug(Number(p)); addInput.focus(); return; }
     if (action === 'pp-save') {

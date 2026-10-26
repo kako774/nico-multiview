@@ -45,6 +45,11 @@ button:hover,select:hover{border-color:var(--btnhv)}
 .sg .ad{font-size:12px;color:var(--ok);flex:0 0 auto;display:none}
 .sg.added .ad{display:block}
 body.sugmode #root{padding:0}
+.srow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0}
+.srow+.srow{border-top:1px solid var(--line)}
+.srow.upd{flex-wrap:wrap;color:var(--accent);font-size:13px}
+.srow .ok{color:var(--ok);font-size:12px}
+.ver{text-align:right;font-size:12px;color:var(--sub);padding-top:6px;border-top:1px solid var(--line)}
 </style></head><body><div id="root"></div>
 <script>
 (() => {
@@ -147,10 +152,29 @@ body.sugmode #root{padding:0}
     report();
   }
 
-  function render() { seq++; document.body.classList.toggle('sugmode', type === 'sug'); if (type === 'sug') renderSUG(); else if (type === 'pp') renderPP(); else if (type === 'ev') renderEV(); else if (type === 'dlg') renderDLG(); }
+  /* ---- 設定 ---- */
+  function renderSET() {
+    root.textContent = '';
+    const row = (label, ctl) => { const r = el('div', 'srow'); r.append(el('span', '', label), ctl); root.appendChild(r); };
+    const sel = (opts, cur, act) => { const s = el('select'); opts.forEach(([v, t]) => s.add(new Option(t, v))); s.value = cur; s.addEventListener('change', () => window.menu.act(act, s.value, true)); return s; };
+    row('テーマ', sel([['system', '自動'], ['light', 'ライト'], ['dark', 'ダーク']], data.theme || 'system', 'set-theme'));
+    const cb = el('input'); cb.type = 'checkbox'; cb.checked = data.playerOnly !== false; cb.title = 'OFFにすると視聴ページ全体を表示します';
+    cb.addEventListener('change', () => window.menu.act('set-po', cb.checked, true));
+    row('プレイヤーのみ', cb);
+    const au = el('div', 'srow'), st = el('span', data.loggedIn ? 'ok' : '', data.loggedIn ? 'ログイン中' : '未ログイン');
+    au.append(st, btn(data.loggedIn ? 'ログアウト' : 'ニコニコにログイン', () => window.menu.act('set-auth', null, true))); root.appendChild(au);
+    if (data.update) {
+      const up = el('div', 'srow upd'); up.append(el('span', '', `🔔 新しいバージョン v${data.update.latest} があります`), btn('ダウンロードページを開く', () => window.menu.act('set-update', null, true)));
+      root.appendChild(up);
+    }
+    if (data.appVersion) root.appendChild(el('div', 'ver', 'ニコ生マルチビュー v' + data.appVersion));
+    report();
+  }
+
+  function render() { seq++; document.body.classList.toggle('sugmode', type === 'sug'); if (type === 'sug') renderSUG(); else if (type === 'pp') renderPP(); else if (type === 'ev') renderEV(); else if (type === 'dlg') renderDLG(); else if (type === 'set') renderSET(); }
   window.menu.onShow((t, d) => { type = t; data = d || {}; render(); });
   // 保存・追加などで内容が変わったとき(イベント一覧は取り直さない)
-  window.menu.onData(d => { data = d || {}; if (type === 'sug') renderSUG(); else if (type === 'pp') renderPP(); else if (type === 'ev') { evN = data.evN || evN; renderEV(); } });
+  window.menu.onData(d => { data = d || {}; if (type === 'sug') renderSUG(); else if (type === 'pp') renderPP(); else if (type === 'ev') { evN = data.evN || evN; renderEV(); } else if (type === 'set') renderSET(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') window.menu.close(); });
 })();
 </script></body></html>

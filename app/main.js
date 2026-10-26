@@ -89,6 +89,22 @@ const PLAYER_JS = `(() => {
   setInterval(() => { window.__nmvUpd(); window.__nmvVolApply(); }, 1000);
   window.__nmvUpd();
 })()`;
+// 新しいバージョンのお知らせ(GitHubの最新リリースと比べるだけ。自動ではダウンロードしない)
+const REL_PAGE = 'https://github.com/kako774/nico-multiview/releases';
+const verNum = s => String(s || '').replace(/^v/i, '').split('.').map(x => parseInt(x, 10) || 0);
+const isNewer = (a, b) => { const x = verNum(a), y = verNum(b); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); } return false; };
+ipcMain.handle('mv:update-check', async () => {
+  try {
+    const res = await net.fetch('https://api.github.com/repos/kako774/nico-multiview/releases/latest', { headers: { Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return { ok: false };
+    const j = await res.json();
+    const tag = String(j && j.tag_name || '');
+    if (!/^v?\d+(\.\d+){1,2}$/.test(tag)) return { ok: false };
+    return { ok: true, latest: tag.replace(/^v/i, ''), newer: isNewer(tag, app.getVersion()) };
+  } catch { return { ok: false }; }
+});
+ipcMain.on('mv:open-release', () => shell.openExternal(REL_PAGE + '/latest'));
+ipcMain.handle('mv:version', () => app.getVersion());
 const hideCmt = {};              // lv番号 -> true なら、映像の上を流れるコメントを隠す
 const applyHide = (id, wc) => {
   if (wc.isDestroyed()) return;
@@ -793,7 +809,7 @@ function placeMenu(h) {
   menuView.setBounds({ x: Math.round(x), y: Math.round(y), width: Math.round(w), height: Math.round(Math.max(60, Math.min(h || 320, ch - y - 8))) });
 }
 ipcMain.on('mv:menu-open', async (_e, type, anchor, data) => {
-  if (!win || !['ev', 'pp', 'dlg', 'sug'].includes(type)) return;
+  if (!win || !['ev', 'pp', 'dlg', 'sug', 'set'].includes(type)) return;
   if (menuOpen && menuType === type) { closeMenu(); return; }
   if (!menuOpen && menuClosedType === type && Date.now() - menuClosedAt < 300) return;   // ボタンを押して閉じた直後の再オープンを防ぐ
   menuLatest = data; menuOpening = true;

@@ -161,8 +161,9 @@ body.sugmode #root{padding:0}
     const cb = el('input'); cb.type = 'checkbox'; cb.checked = data.playerOnly !== false; cb.title = 'OFFにすると視聴ページ全体を表示します';
     cb.addEventListener('change', () => window.menu.act('set-po', cb.checked, true));
     row('プレイヤーのみ', cb);
-    const au = el('div', 'srow'), st = el('span', data.loggedIn ? 'ok' : '', data.loggedIn ? 'ログイン中' : '未ログイン');
+    const au = el('div', 'srow'), st = el('span', data.loggedIn ? 'ok' : '', data.loggedIn ? 'ログイン中' + (data.loginVia ? ' (' + data.loginVia + ')' : '') : '未ログイン');
     au.append(st, btn(data.loggedIn ? 'ログアウト' : 'ニコニコにログイン', () => window.menu.act('set-auth', null, true))); root.appendChild(au);
+    if (!data.loggedIn) { const im = el('div', 'srow'); im.append(el('span', '', 'Googleで入れないとき'), btn('ブラウザでログイン', () => window.menu.act('set-browser', null, true))); root.appendChild(im); }
     if (data.update) {
       const up = el('div', 'srow upd'); up.append(el('span', '', `🔔 新しいバージョン v${data.update.latest} があります`), btn('ダウンロードページを開く', () => window.menu.act('set-update', null, true)));
       root.appendChild(up);

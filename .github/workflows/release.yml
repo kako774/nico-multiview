@@ -42,4 +42,4 @@ jobs:
           files: app/NicoMultiView-win.zip
           tag_name: ${{ steps.ver.outputs.tag }}
           name: ${{ steps.ver.outputs.tag }}
-          generate_release_notes: true
+          body_path: app/release-notes.md

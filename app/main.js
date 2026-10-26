@@ -27,6 +27,8 @@ const fixUA = ua => ua
   .replace(new RegExp('\\s' + escRe(app.name) + '\\/\\S+', 'g'), '')
   .replace(/\s(Electron|nico-multiview)\/\S+/g, '');
 app.userAgentFallback = fixUA(app.userAgentFallback);
+// 終了中に、すでに閉じた窓・ビューへ触れて出る「Object has been destroyed」は、害がないので無視する(それ以外のエラーは、これまでどおり表示)
+process.on('uncaughtException', err => { if (/Object has been destroyed/.test(String(err && err.message))) return; throw err; });
 const ses = () => session.fromPartition(PARTITION);
 
 /* ------------------------------------------------------------------ *
@@ -91,6 +93,7 @@ const PLAYER_JS = `(() => {
 })()`;
 // 新しいバージョンのお知らせ(GitHubの最新リリースと比べるだけ。自動ではダウンロードしない)
 const REL_PAGE = 'https://github.com/kako774/nico-multiview/releases';
+const DL_PAGE = 'https://nico-ran.stream/tools/nico-multiview/';
 const verNum = s => String(s || '').replace(/^v/i, '').split('.').map(x => parseInt(x, 10) || 0);
 const isNewer = (a, b) => { const x = verNum(a), y = verNum(b); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); } return false; };
 ipcMain.handle('mv:update-check', async () => {
@@ -103,7 +106,7 @@ ipcMain.handle('mv:update-check', async () => {
     return { ok: true, latest: tag.replace(/^v/i, ''), newer: isNewer(tag, app.getVersion()) };
   } catch { return { ok: false }; }
 });
-ipcMain.on('mv:open-release', () => shell.openExternal(REL_PAGE + '/latest'));
+ipcMain.on('mv:open-release', () => shell.openExternal(DL_PAGE));
 ipcMain.handle('mv:version', () => app.getVersion());
 const hideCmt = {};              // lv番号 -> true なら、映像の上を流れるコメントを隠す
 const applyHide = (id, wc) => {
@@ -377,9 +380,14 @@ async function isLoggedIn() {
   const cs = await ses().cookies.get({ name: 'user_session' });
   return cs.some(c => /(^|\.)nicovideo\.jp$/.test(c.domain) && c.value && c.value !== 'deleted');
 }
+// ログインのしかた(Googleなど)を覚えておき、設定に「(Google)」と表示する
+const viaFile = () => path.join(app.getPath('userData'), 'login-via.txt');
+let loginVia = '';
+try { loginVia = require('fs').readFileSync(viaFile(), 'utf8').trim(); } catch { /* なし */ }
+function setVia(s) { loginVia = s || ''; try { require('fs').writeFileSync(viaFile(), loginVia); } catch { /* 無視 */ } }
 async function notifyAuth() {
   const v = await isLoggedIn().catch(() => false);
-  if (win && !win.isDestroyed()) win.webContents.send('mv:auth', v);
+  if (win && !win.isDestroyed()) win.webContents.send('mv:auth', v, v ? loginVia : '');
   return v;
 }
 function openLogin() {
@@ -399,7 +407,79 @@ function openLogin() {
   loginWin.on('closed', () => { loginWin = null; });
   wc.loadURL(LOGIN_URL);
 }
+
+// 普段のブラウザ(Chrome / Edge)でログインして、そのログイン状態をこのアプリに取り込む。
+// Googleなどのログインは、アプリ内の画面だと断られるため。専用のプロフィールで本物のブラウザを開き、
+// ログインできたら cookie(nicovideo.jp のぶんだけ)を受け取ってブラウザを閉じる。
+const { spawn } = require('child_process');
+let browserLoginRun = null;
+function findBrowser() {
+  const e = process.env, list = [];
+  if (process.platform === 'win32') {
+    for (const b of [e['PROGRAMFILES'], e['PROGRAMFILES(X86)'], e['LOCALAPPDATA']].filter(Boolean)) {
+      list.push(path.join(b, 'Google', 'Chrome', 'Application', 'chrome.exe'), path.join(b, 'Microsoft', 'Edge', 'Application', 'msedge.exe'));
+    }
+  } else if (process.platform === 'darwin') {
+    list.push('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge');
+  } else list.push('/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/microsoft-edge');
+  return list.find(p => { try { return require('fs').existsSync(p); } catch { return false; } }) || '';
+}
+function cdpCall(wsUrl, method, params) {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(wsUrl);
+    const t = setTimeout(() => { try { ws.close(); } catch {} reject(new Error('timeout')); }, 5000);
+    ws.onopen = () => ws.send(JSON.stringify({ id: 1, method, params: params || {} }));
+    ws.onmessage = ev => { try { const j = JSON.parse(ev.data); if (j.id === 1) { clearTimeout(t); try { ws.close(); } catch {} j.error ? reject(new Error(j.error.message)) : resolve(j.result); } } catch {} };
+    ws.onerror = () => { clearTimeout(t); reject(new Error('ws')); };
+  });
+}
+async function browserCookies(port) {
+  const info = await (await fetch(`http://127.0.0.1:${port}/json/version`)).json();
+  const r = await cdpCall(info.webSocketDebuggerUrl, 'Storage.getCookies');
+  return { cookies: (r.cookies || []).filter(c => /(^|\.)nicovideo\.jp$/.test(c.domain.replace(/^\./, ''))), ws: info.webSocketDebuggerUrl };
+}
+async function browserLogin() {
+  if (browserLoginRun) { return { ok: false, error: 'ブラウザでのログインを待っています(開いているブラウザの窓で、ログインしてください)' }; }
+  const exe = findBrowser();
+  if (!exe) return { ok: false, error: 'Chrome か Edge が見つかりませんでした' };
+  const port = 9300 + Math.floor(Math.random() * 600);
+  const dir = path.join(app.getPath('userData'), 'browser-login');
+  const child = spawn(exe, [`--remote-debugging-port=${port}`, '--remote-debugging-address=127.0.0.1', `--user-data-dir=${dir}`, '--no-first-run', '--no-default-browser-check', LOGIN_URL], { detached: true, stdio: 'ignore' });
+  child.on('error', () => {});
+  child.unref();
+  browserLoginRun = true;
+  const until = Date.now() + 10 * 60 * 1000;
+  let done = false, wsUrl = '', viaGoogle = false;
+  while (Date.now() < until && !done) {
+    await new Promise(r => setTimeout(r, 2000));
+    try {
+      const got = await browserCookies(port);
+      wsUrl = got.ws;
+      try { const tg = await cdpCall(got.ws, 'Target.getTargets'); if ((tg.targetInfos || []).some(t => /^https:\/\/accounts\.google\.com\//.test(t.url || ''))) viaGoogle = true; } catch { /* 無視 */ }
+      const us = got.cookies.find(c => c.name === 'user_session' && c.value && c.value !== 'deleted' && c.value.length > 20);
+      if (us) {
+        for (const c of got.cookies.filter(c => c.name === 'user_session' || c.name === 'user_session_secure')) {
+          if (!c.value || c.value === 'deleted') continue;
+          await ses().cookies.set({ url: 'https://www.nicovideo.jp/', domain: c.domain, path: c.path || '/', name: c.name, value: c.value, secure: true, httpOnly: true, expirationDate: c.expires > 0 ? c.expires : Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30 });
+        }
+        await ses().cookies.flushStore();
+        done = true;
+      }
+    } catch (e) {
+      if (wsUrl) break;   // 一度つながったあとに切れた = ブラウザが閉じられた
+    }
+  }
+  if (wsUrl) cdpCall(wsUrl, 'Browser.close').catch(() => {});
+  browserLoginRun = null;
+  if (done) { setVia(viaGoogle ? 'Google' : ''); reloadAll(); notifyAuth(); return { ok: true }; }
+  return { ok: false, error: 'ログインを確認できませんでした' };
+}
+ipcMain.on('mv:browser-login', async () => {
+  const r = await browserLogin();
+  if (win && !win.isDestroyed()) win.webContents.send('mv:browser-login-result', r);
+});
 async function logout() {
+  setVia('');
   await ses().clearStorageData({ storages: ['cookies'] });
   reloadAll();
   notifyAuth();
@@ -564,7 +644,7 @@ const liveReaders = new Map();   // lv番号 -> { ctl, maxN, fails }
 function addLiveItems(id, list) {
   const now = Date.now();
   const items = list.filter(c => c && typeof c.x === 'string' && c.x)
-    .map(c => ({ t: now, id, no: Number(c.n) || 0, text: c.x.slice(0, 1000), nm: c.nm || '' }));
+    .map(c => ({ t: (Number(c.at) > 1e9 ? Number(c.at) * 1000 : now), id, no: Number(c.n) || 0, text: c.x.slice(0, 1000), nm: c.nm || '', u: typeof c.u === 'string' ? c.u.slice(0, 80) : '' }));
   if (!items.length) return;
   commentBuf.push(...items);
   if (commentBuf.length > MAX_BUF) commentBuf.splice(0, commentBuf.length - MAX_BUF);
@@ -835,7 +915,7 @@ function ensureMenu() {
   win.contentView.addChildView(menuView);
   menuReady = new Promise(res => menuView.webContents.once('did-finish-load', res));
   menuView.webContents.loadFile(path.join(__dirname, 'menu.html'));
-  menuView.webContents.on('blur', () => { if (menuType !== 'sug' && Date.now() - menuOpenedAt > 500) closeMenu(); });
+  menuView.webContents.on('blur', () => { try { if (menuType !== 'sug' && Date.now() - menuOpenedAt > 500) closeMenu(); } catch { /* 終了中は無視 */ } });
   menuView.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   return menuReady;
 }
@@ -843,8 +923,8 @@ function raiseMenu() { if (menuView && menuOpen && win) { win.contentView.remove
 function closeMenu() {
   if (!menuOpen) return;
   menuOpen = false; menuClosedAt = Date.now(); menuClosedType = menuType;
-  if (menuView && !menuView.webContents.isDestroyed()) menuView.setVisible(false);
-  if (win && !win.isDestroyed()) win.webContents.send('mv:menu-closed', menuType);
+  try { if (menuView && !menuView.webContents.isDestroyed()) menuView.setVisible(false); } catch { /* 終了中は無視 */ }
+  try { if (win && !win.isDestroyed()) win.webContents.send('mv:menu-closed', menuType); } catch { /* 終了中は無視 */ }
 }
 function placeMenu(h) {
   if (!menuPos || !win) return;
@@ -943,6 +1023,7 @@ ipcMain.on('gift:reopen', () => { if (giftTarget) giftLoad(giftTarget); });
 ipcMain.on('mv:reload', (_e, id) => { const v = views.get(id); if (v) v.webContents.loadURL(WATCH(id)); });
 ipcMain.on('mv:external', (_e, id) => { if (ID_RE.test(id)) shell.openExternal(WATCH(id)); });
 ipcMain.handle('mv:auth', () => isLoggedIn().catch(() => false));
+ipcMain.handle('mv:auth-via', () => loginVia);
 ipcMain.on('mv:login', () => openLogin());
 ipcMain.on('mv:logout', () => { logout(); });
 

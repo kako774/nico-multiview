@@ -167,7 +167,7 @@ body.showCmt .foot{display:flex}
   const $ = s => document.querySelector(s);
   const stage = $('#stage'), emptyEl = $('#empty'), msg = $('#msg'), layoutSel = $('#layout');
   let items = [], layout = 'auto', audioIds = [];   // 音声ONの枠(複数可)
-  let playerOnly = true, showCmt = true, use184 = false, loggedIn = false;
+  let playerOnly = true, showCmt = true, use184 = false, loggedIn = false, loginVia = '';
   let theme = 'system';
   let hideCmts = {};   // 枠ごとの「流れるコメントを隠す」
   let volumes = {}, lastVol = 0.5;   // 枠ごとの音量(0〜1)と、最後に動かした音量(新しい枠の初期値)
@@ -192,7 +192,7 @@ body.showCmt .foot{display:flex}
 
   /* ---------- ログイン表示 ---------- */
   function renderAuth() {
-    $('#authState').textContent = loggedIn ? 'ログイン中' : '未ログイン';
+    $('#authState').textContent = loggedIn ? 'ログイン中' + (loginVia ? ' (' + loginVia + ')' : '') : '未ログイン';
     $('#authState').className = loggedIn ? 'in' : '';
     $('#authBtn').textContent = loggedIn ? 'ログアウト' : 'ニコニコにログイン';
     if (menuType === 'set') window.mv.menuData(menuData());
@@ -506,8 +506,9 @@ body.showCmt .foot{display:flex}
     if (loggedIn) { if (confirm('ニコニコからログアウトしますか?')) window.mv.logout(); }
     else window.mv.login();
   });
-  window.mv.onAuth(v => {
-    const was = loggedIn; loggedIn = v; renderAuth();
+  window.mv.onBrowserLogin(r => { if (r && !r.ok && r.error) say(r.error); });
+  window.mv.onAuth((v, via) => {
+    const was = loggedIn; loggedIn = v; loginVia = v ? (via || '') : ''; renderAuth();
     if (v && !was) say('ログインしました');
     if (!v && was) say('ログアウトしました');
   });
@@ -568,7 +569,7 @@ body.showCmt .foot{display:flex}
   // メニュー(映像と同じネイティブのビューで、いちばん手前に出る)
   function menuData() {
     const names = {}; presets.forEach(p => p.items.forEach(id => { names[id] = nameOf(id); })); items.forEach(id => { names[id] = nameOf(id); });
-    return { theme, playerOnly, loggedIn, appVersion, update: updateInfo, presets, names, evKeys, evTrack, evN, dlgCount: items.length, dlgNames: items.map(nameOf) };
+    return { theme, playerOnly, loggedIn, loginVia, appVersion, update: updateInfo, presets, names, evKeys, evTrack, evN, dlgCount: items.length, dlgNames: items.map(nameOf) };
   }
   function openMenu(type, btn) {
     const r = btn.getBoundingClientRect();
@@ -589,6 +590,7 @@ body.showCmt .foot{display:flex}
     if (action === 'set-po') { poEl.checked = !!p; poEl.dispatchEvent(new Event('change')); window.mv.menuData(menuData()); return; }
     if (action === 'set-update') { window.mv.openRelease(); return; }
     if (action === 'set-auth') { $('#authBtn').click(); return; }
+    if (action === 'set-browser') { say('ブラウザが開きます。ログインすると、自動でこのアプリに反映されます'); window.mv.browserLogin(); return; }
     if (action === 'sug-hover') { sgIdx = Number(p); return; }
     if (action === 'sug-pick') { pickSug(Number(p)); addInput.focus(); return; }
     if (action === 'pp-save') {
@@ -670,6 +672,7 @@ body.showCmt .foot{display:flex}
   /* ---------- 起動時 ---------- */
   Promise.all([window.mv.load(), window.mv.auth()]).then(([s, a]) => {
     loggedIn = !!a;
+    window.mv.authVia().then(v => { loginVia = loggedIn ? (v || '') : ''; renderAuth(); }).catch(() => {});
     if (s && Array.isArray(s.items)) {
       items = s.items.filter(x => /^lv\d+$/.test(x)).slice(0, MAX);
       layout = ['auto', 'main', 'row', 'col'].includes(s.layout) ? s.layout : 'auto';

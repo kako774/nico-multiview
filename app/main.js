@@ -556,18 +556,64 @@ ipcMain.on('mv:open-viewer', () => openViewer());
 ipcMain.handle('vw:init', () => ({ backlog: commentBuf, sources: sourcesList() }));
 ipcMain.on('vw:clear', () => { commentBuf.length = 0; });
 ipcMain.on('vw:ontop', (_e, v) => { if (viewerWin && !viewerWin.isDestroyed()) viewerWin.setAlwaysOnTop(!!v); });
-ipcMain.on('mv:comments', (e, list) => {
-  const hit = [...views].find(([, v]) => v.webContents === e.sender);
-  if (!hit || !Array.isArray(list)) return;
+// コメントは、サイト(nico-ran.stream)のコメントビューアと同じ流し込み(SSE)から受け取る。
+// 画面の一覧を読み取る方式は、画面の作りが変わると止まるので使わない(view-preload.js の読み取りは送らない扱い)。
+ipcMain.on('mv:comments', () => {});
+const LIVE_API = 'https://nico-ran.stream/api/comments-live';
+const liveReaders = new Map();   // lv番号 -> { ctl, maxN, fails }
+function addLiveItems(id, list) {
   const now = Date.now();
-  const items = list.slice(0, 200)
-    .filter(x => x && typeof x.text === 'string' && x.text)
-    .map(x => ({ t: now, id: hit[0], no: Number(x.no) || 0, text: x.text.slice(0, 1000) }));
+  const items = list.filter(c => c && typeof c.x === 'string' && c.x)
+    .map(c => ({ t: now, id, no: Number(c.n) || 0, text: c.x.slice(0, 1000), nm: c.nm || '' }));
   if (!items.length) return;
   commentBuf.push(...items);
   if (commentBuf.length > MAX_BUF) commentBuf.splice(0, commentBuf.length - MAX_BUF);
   pushViewer('vw:comments', items);
-});
+}
+async function liveLoop(id, st) {
+  while (!st.ctl.signal.aborted) {
+    let wait = 300;
+    try {
+      const res = await net.fetch(`${LIVE_API}?lv=${encodeURIComponent(id)}&after=${st.maxN}`, { signal: st.ctl.signal });
+      if (!res.ok || !res.body) throw new Error('http ' + res.status);
+      const rd = res.body.getReader(), dec = new TextDecoder();
+      let buf = '';
+      for (;;) {
+        const r = await rd.read();
+        if (r.done) break;
+        buf += dec.decode(r.value, { stream: true });
+        let k;
+        while ((k = buf.indexOf('\n\n')) >= 0) {
+          const block = buf.slice(0, k); buf = buf.slice(k + 2);
+          const ev = (/^event: (.+)$/m.exec(block) || [])[1], data = (/^data: (.*)$/m.exec(block) || [])[1];
+          if (!ev || data === undefined) continue;
+          let j; try { j = JSON.parse(data); } catch { continue; }
+          if (ev === 'c' && Array.isArray(j)) { st.fails = 0; for (const c of j) if (c.n > st.maxN) st.maxN = c.n; addLiveItems(id, j); }
+          else if (ev === 'bye') { if (j && j.after > st.maxN) st.maxN = j.after; }
+          else if (ev === 'gone') { st.gone = true; }
+          else if (ev === 'srverr') { st.fails++; wait = Math.min(8000, 1500 * st.fails); }
+        }
+      }
+      if (st.gone) return;
+    } catch (e) {
+      if (st.ctl.signal.aborted) return;
+      st.fails++; wait = Math.min(8000, 1500 * st.fails);
+    }
+    await new Promise(r => setTimeout(r, wait));
+  }
+}
+// コメントビューアの窓が開いている間だけ、いま開いている各枠のコメントを受け取る
+function syncLive() {
+  const want = new Set(viewerWin && !viewerWin.isDestroyed() ? views.keys() : []);
+  for (const [id, st] of liveReaders) if (!want.has(id) || st.gone) { st.ctl.abort(); liveReaders.delete(id); }
+  for (const id of want) {
+    if (liveReaders.has(id) || !/^lv\d+$/.test(id)) continue;
+    const st = { ctl: new AbortController(), maxN: 0, fails: 0, gone: false };
+    liveReaders.set(id, st);
+    liveLoop(id, st);
+  }
+}
+setInterval(syncLive, 2000);
 
 
 /* ------------------------------------------------------------------ *
@@ -900,6 +946,7 @@ ipcMain.handle('mv:auth', () => isLoggedIn().catch(() => false));
 ipcMain.on('mv:login', () => openLogin());
 ipcMain.on('mv:logout', () => { logout(); });
 
+app.setAppUserModelId('dev.nico-multiview');
 app.whenReady().then(() => {
   // ログインが完了したら(user_session が付いたら)ログイン画面を閉じて全枠を読み込み直す
   ses().cookies.on('changed', async (_e, cookie, _cause, removed) => {

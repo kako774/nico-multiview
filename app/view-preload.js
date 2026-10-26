@@ -45,24 +45,57 @@ window.addEventListener('click', e => { if (suppressClick) { e.stopPropagation()
 const ROW = '[class*="___comment-data-grid___"] [class*="___table-row___"]';
 const TABLE = '[class*="___comment-data-grid___"] [class*="___body___"] [class*="___table___"]';
 const seen = new Set();
-let scanTimer = 0;
+let scanTimer = 0, prevTexts = null;
+
+// 番号のない一覧(幅がせまいときは「コメント」列だけ)用: 前回の一覧とのずれから、新しく増えた分だけを取り出す
+function alignNew(prev, cur) {
+  const n = cur.length;
+  if (!prev || !prev.length) return cur.slice();
+  const eq = (a, b, k) => { for (let i = 0; i < k; i++) if (a[i] !== b[i]) return false; return true; };
+  let down = n, up = n;   // 下に追加(古い→新しい)・上に追加(新しい→古い)のずれの大きさ
+  for (let s = 0; s <= n; s++) { if (n - s <= prev.length - s && eq(cur, prev.slice(s), n - s)) { down = s; break; } }
+  for (let s = 0; s <= n; s++) { if (n - s <= prev.length && eq(cur.slice(s), prev, n - s)) { up = s; break; } }
+  if (down === n && up === n) return cur.slice();
+  return down <= up ? cur.slice(n - down) : cur.slice(0, up);
+}
+
+// 一覧が下まで追従していないと、新しいコメントが描画されない(行が増えない)ので、見えない間は下に張りつけておく
+function pinBottom() {
+  if (!playerOnly()) return;
+  const b = document.querySelector('[class*="___comment-data-grid___"] [class*="___body___"]');
+  if (b && b.scrollHeight - b.scrollTop - b.clientHeight > 8) b.scrollTop = b.scrollHeight;
+}
 
 function scan() {
   scanTimer = 0;
+  pinBottom();
   const out = [];
+  const texts = [];
   document.querySelectorAll(ROW).forEach(r => {
     const c = r.querySelector('[class*="___table-cell___"]');
-    if (!c || c.children.length < 2) return;
-    const no = (c.children[0].textContent || '').trim();
-    const text = (c.children[1].textContent || '').trim();
-    if (!/^\d+$/.test(no) || !text || seen.has(no)) return;
-    seen.add(no);
-    out.push({ no: Number(no), text });
+    if (!c) return;
+    // 番号つきの一覧(広い表示): 1つめが番号、2つめが本文
+    if (c.children.length >= 2 && /^\d+$/.test((c.children[0].textContent || '').trim())) {
+      const no = (c.children[0].textContent || '').trim();
+      const text = (c.children[1].textContent || '').trim();
+      if (!text || seen.has(no)) return;
+      seen.add(no);
+      out.push({ no: Number(no), text });
+      return;
+    }
+    // 番号のない一覧(せまい表示): 本文だけ
+    const ct = r.querySelector('.comment-text');
+    const text = ct ? (ct.textContent || '').trim() : '';
+    if (text) texts.push(text);
   });
+  if (texts.length) {
+    alignNew(prevTexts, texts).forEach(t => out.push({ no: 0, text: t }));
+    prevTexts = texts;
+  }
   if (seen.size > 4000) { const keep = [...seen].slice(-2000); seen.clear(); keep.forEach(k => seen.add(k)); }
   if (out.length) ipcRenderer.send('mv:comments', out);
 }
-const schedule = () => { if (!scanTimer) scanTimer = setTimeout(scan, 120); };
+const schedule = () => { if (!scanTimer) scanTimer = setTimeout(scan, 80); };
 
 let watched = null;
 function attach() {
@@ -73,7 +106,7 @@ function attach() {
     schedule();
   }
 }
-setInterval(() => { attach(); schedule(); }, 1000);   // 画面の作り直しや取りこぼしへの保険
+setInterval(() => { attach(); schedule(); }, 400);   // 画面の作り直しや取りこぼしへの保険
 
 // ブラウザから、放送のリンク(URL)をこの枠へドラッグして追加できるようにする
 const dropText = dt => {

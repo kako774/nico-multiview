@@ -1,0 +1,13 @@
+import fs from 'fs';
+import * as R from 'resedit';
+const [exe, ver] = process.argv.slice(2);
+const e = R.NtExecutable.from(fs.readFileSync(exe));
+const res = R.NtExecutableResource.from(e);
+const vi = R.Resource.VersionInfo.fromEntries(res.entries)[0];
+const [a,b,c] = ver.split('.').map(Number);
+vi.setFileVersion(a,b,c,0,1033); vi.setProductVersion(a,b,c,0,1033);
+const s = { FileDescription:'ニコ生マルチビュー', ProductName:'ニコ生マルチビュー', InternalName:'NicoMultiView', OriginalFilename:'NicoMultiView.exe', CompanyName:'kako774', LegalCopyright:'kako774' };
+vi.setStringValues({lang:1033, codepage:1200}, s);
+vi.outputToResourceEntries(res.entries);
+res.outputResource(e);
+fs.writeFileSync(exe, Buffer.from(e.generate()));

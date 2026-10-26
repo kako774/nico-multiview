@@ -21,6 +21,7 @@ jobs:
       - run: npm i --no-save resedit
       - run: npx electron-builder --win dir --x64
       - run: node tools/seticon.mjs dist/win-unpacked/NicoMultiView.exe icon.ico
+      - run: node tools/setver.mjs dist/win-unpacked/NicoMultiView.exe ${{ steps.ver.outputs.v }}
       - name: フォルダをまとめてZIPにする
         shell: pwsh
         run: |

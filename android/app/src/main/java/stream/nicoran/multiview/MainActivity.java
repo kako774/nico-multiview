@@ -79,7 +79,11 @@ public class MainActivity extends Activity {
     private int topN = 4;
     private int trackGen = 0;
     private boolean trackBusy = false;
-    private Button evBtn, topBtn;
+    private Button evBtn, topBtn, loginBtn;
+    private String focusId = "";
+    private final Map<String, Integer> vols = new HashMap<>();           // 枠ごとの音量(%)
+    private final Map<String, String[]> smCache = new HashMap<>();      // lv -> {取得時刻, 通常, 改, 神}
+    private final Map<String, String> smText = new HashMap<>();         // lv -> 召喚獣の表示
     private final Map<String, long[]> liveT = new HashMap<>();     // uid -> 取得時刻
     private final Map<String, String> liveOf = new HashMap<>();    // uid -> 放送中のlv(なければ"")
 
@@ -134,12 +138,14 @@ public class MainActivity extends Activity {
 
         LinearLayout row2 = new LinearLayout(this);
         row2.setOrientation(LinearLayout.HORIZONTAL);
-        row2.addView(btn("ログイン", v -> openOverlay("ログイン", "https://account.nicovideo.jp/login?site=nicolive")));
+        loginBtn = btn("ログイン", v -> openOverlay("ログイン", "https://account.nicovideo.jp/login?site=nicolive"));
+        row2.addView(loginBtn);
         row2.addView(btn("全て消音", v -> { audioId = ""; applyAudio(); }));
         evBtn = btn("ギフトイベント", v -> onEventButton());
         row2.addView(evBtn);
         topBtn = btn("上位4", v -> { topN = topN >= 6 ? 2 : (topN == 2 ? 3 : (topN == 3 ? 4 : 6)); topBtn.setText("上位" + topN); if (!trackKey.isEmpty()) refreshTop(); });
         row2.addView(topBtn);
+        row2.addView(btn("保存枠", v -> showPresets()));
         row2.addView(btn("全画面", v -> setFull(true)));
         toolbar.addView(row2, new LinearLayout.LayoutParams(-1, -2));
 
@@ -153,6 +159,7 @@ public class MainActivity extends Activity {
         for (String s : saved.split(",")) if (LV.matcher(s).matches() && !manual.contains(s)) manual.add(s);
         Matcher m = LV.matcher(String.valueOf(getIntent() == null ? "" : getIntent().getDataString()));
         if (m.find()) addId(m.group().toLowerCase());
+        updateLoginLabel();
         recompute(); rebuild();
     }
 
@@ -224,6 +231,8 @@ public class MainActivity extends Activity {
             @Override public void onPageFinished(WebView v, String url) {
                 v.evaluateJavascript(playerJs, null);
                 v.evaluateJavascript("window.__nmvMute=" + (id.equals(audioId) ? "false" : "true") + ";", null);
+                Integer vv = vols.get(id);
+                if (vv != null) v.evaluateJavascript("window.__nmvVol=" + (vv / 100.0) + ";", null);
             }
             @Override public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
                 return !"https".equals(r.getUrl().getScheme());
@@ -263,6 +272,17 @@ public class MainActivity extends Activity {
             "https://gift.nicovideo.jp/live/" + id + "/purchase?frontend_id=9&frontend_version=658.1.0&item_list_disabled=false")));
         final WebView ww = w;
         bar.addView(chip("↻", v -> ww.reload()));
+        bar.addView(chip("⛶", v -> { focusId = id.equals(focusId) ? "" : id; rebuild(); }));
+        android.widget.SeekBar sb = new android.widget.SeekBar(this);
+        sb.setMax(100); sb.setProgress(vols.containsKey(id) ? vols.get(id) : 100);
+        sb.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(android.widget.SeekBar b, int p, boolean u) {
+                vols.put(id, p); ww.evaluateJavascript("window.__nmvVol=" + (p / 100.0) + ";", null);
+            }
+            @Override public void onStartTrackingTouch(android.widget.SeekBar b) { }
+            @Override public void onStopTrackingTouch(android.widget.SeekBar b) { }
+        });
+        bar.addView(sb, new LinearLayout.LayoutParams(dp(80), -2));
         bar.addView(chip("✕", v -> removeId(id)));
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END);
         f.addView(bar, lp);
@@ -270,7 +290,7 @@ public class MainActivity extends Activity {
         lab.setTextColor(Color.WHITE); lab.setTextSize(12); lab.setSingleLine(true);
         lab.setBackgroundColor(0x99000000); lab.setPadding(dp(6), dp(2), dp(6), dp(2));
         lab.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        lab.setMaxWidth(dp(220));
+        lab.setMaxWidth(dp(300));
         labels.put(id, lab);
         String lt = labelText.get(id);
         lab.setText(lt == null ? "" : lt); lab.setVisibility(lt == null || lt.isEmpty() ? View.GONE : View.VISIBLE);
@@ -302,7 +322,9 @@ public class MainActivity extends Activity {
         for (FrameLayout t : tiles.values()) if (t.getParent() != null) ((ViewGroup) t.getParent()).removeView(t);
         for (int i = stage.getChildCount() - 1; i >= 0; i--) stage.removeViewAt(i);
         for (String id : ids) if (!tiles.containsKey(id)) tiles.put(id, makeTile(id));
-        int n = ids.size();
+        if (!focusId.isEmpty() && !ids.contains(focusId)) focusId = "";
+        List<String> show = focusId.isEmpty() ? ids : java.util.Collections.singletonList(focusId);
+        int n = show.size();
         if (n == 0) {
             TextView t = new TextView(this);
             t.setText("上の欄に、ニコ生の放送(lv番号かURL)を入れて「追加」してください。\n複数入れると、画面を分けて同時に表示します。");
@@ -322,13 +344,63 @@ public class MainActivity extends Activity {
                 if (idx < n) {
                     LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -1, 1);
                     lp.setMargins(1, 1, 1, 1);
-                    row.addView(tiles.get(ids.get(idx++)), lp);
+                    row.addView(tiles.get(show.get(idx++)), lp);
                 } else {
                     row.addView(new View(this), new LinearLayout.LayoutParams(0, -1, 1));
                 }
             }
         }
         applyAudio();
+    }
+
+    /* ---------------- 枠の保存 ---------------- */
+    private JSONObject loadPresets() {
+        try { return new JSONObject(prefs.getString("presets", "{}")); } catch (Exception e) { return new JSONObject(); }
+    }
+
+    private void showPresets() {
+        final JSONObject p = loadPresets();
+        final List<String> names = new ArrayList<>();
+        java.util.Iterator<String> it = p.keys();
+        while (it.hasNext()) names.add(it.next());
+        java.util.Collections.sort(names);
+        String[] items = new String[names.size() + 1];
+        for (int i = 0; i < names.size(); i++) items[i] = names.get(i) + "(" + p.optJSONArray(names.get(i)).length() + "枠)";
+        items[names.size()] = "＋ いまの枠を保存…";
+        new AlertDialog.Builder(this).setTitle("枠の保存").setItems(items, (d, which) -> {
+            if (which == names.size()) savePresetDialog(); else presetActions(names.get(which), p);
+        }).setNegativeButton("閉じる", null).show();
+    }
+
+    private void savePresetDialog() {
+        if (ids.isEmpty()) { Toast.makeText(this, "保存する枠がありません", Toast.LENGTH_SHORT).show(); return; }
+        final EditText e = new EditText(this);
+        e.setHint("名前"); e.setSingleLine(true);
+        new AlertDialog.Builder(this).setTitle("いまの枠を保存").setView(e).setPositiveButton("保存", (d, w) -> {
+            String name = e.getText().toString().trim();
+            if (name.isEmpty()) return;
+            try {
+                JSONObject p = loadPresets();
+                p.put(name, new JSONArray(new ArrayList<>(ids)));
+                prefs.edit().putString("presets", p.toString()).apply();
+                Toast.makeText(this, "保存しました", Toast.LENGTH_SHORT).show();
+            } catch (Exception ex) { Toast.makeText(this, "保存できませんでした", Toast.LENGTH_SHORT).show(); }
+        }).setNegativeButton("キャンセル", null).show();
+    }
+
+    private void presetActions(final String name, final JSONObject p) {
+        new AlertDialog.Builder(this).setTitle(name).setItems(new String[]{"開く(いまの枠と入れ替え)", "削除"}, (d, which) -> {
+            if (which == 0) {
+                JSONArray a = p.optJSONArray(name);
+                manual.clear();
+                if (a != null) for (int i = 0; i < a.length(); i++) { String id = a.optString(i); if (LV.matcher(id).matches()) manual.add(id); }
+                if (!trackKey.isEmpty()) stopTrack();
+                save(); recompute(); rebuild();
+            } else {
+                p.remove(name);
+                prefs.edit().putString("presets", p.toString()).apply();
+            }
+        }).setNegativeButton("キャンセル", null).show();
     }
 
     /* ---------------- ギフトイベント ---------------- */
@@ -486,6 +558,17 @@ public class MainActivity extends Activity {
                             synchronized (liveOf) { liveT.put(uid, new long[]{now}); liveOf.put(uid, lv); }
                         }
                         t[4] = lv == null ? "" : lv;
+                        if (lv != null) {
+                            String[] c;
+                            synchronized (smCache) { c = smCache.get(lv); }
+                            if (c == null || now - Long.parseLong(c[0]) > 30000) {
+                                int[] k = summonsOf(lv);
+                                c = new String[]{String.valueOf(now), String.valueOf(k[0]), String.valueOf(k[1]), String.valueOf(k[2])};
+                                synchronized (smCache) { smCache.put(lv, c); }
+                            }
+                            String tx = (c[1].equals("0") ? "" : " 召喚獣" + c[1]) + (c[2].equals("0") ? "" : " 改" + c[2]) + (c[3].equals("0") ? "" : " 神" + c[3]);
+                            synchronized (smText) { smText.put(lv, tx); }
+                        }
                     }));
                 }
                 for (Future<?> f : fs) { try { f.get(); } catch (Exception ignored) { } }
@@ -497,6 +580,33 @@ public class MainActivity extends Activity {
                 ui.postDelayed(this::refreshTop, 10000);
             });
         });
+    }
+
+    /** 番組のギフト履歴から、召喚獣(通常/改/神)の個数を数える */
+    private int[] summonsOf(String lv) {
+        int[] out = new int[3];
+        HttpURLConnection c = null;
+        try {
+            c = (HttpURLConnection) new URL("https://api.gift.nicovideo.jp/v3/contents/nage_agv/" + lv + "/histories").openConnection();
+            c.setConnectTimeout(6000); c.setReadTimeout(6000);
+            c.setRequestProperty("Accept", "application/json");
+            c.setRequestProperty("x-frontend-id", "9"); c.setRequestProperty("x-frontend-version", "657.0.0");
+            c.setRequestProperty("Origin", "https://gift.nicovideo.jp"); c.setRequestProperty("Referer", "https://gift.nicovideo.jp/");
+            c.setRequestProperty("User-Agent", uaReal);
+            if (c.getResponseCode() != 200) return out;
+            ByteArrayOutputStream o = new ByteArrayOutputStream();
+            try (InputStream in = c.getInputStream()) { byte[] buf = new byte[8192]; int n; while ((n = in.read(buf)) > 0) o.write(buf, 0, n); }
+            JSONArray hs = new JSONObject(o.toString("UTF-8")).getJSONObject("data").getJSONArray("histories");
+            for (int i = 0; i < hs.length(); i++) {
+                JSONObject item = hs.getJSONObject(i).optJSONObject("item");
+                String name = item == null ? "" : java.text.Normalizer.normalize(item.optString("name", ""), java.text.Normalizer.Form.NFKC).replaceAll("\\s+", "");
+                if (!name.startsWith("召喚獣")) continue;
+                if (name.contains("神") || name.contains("ゴッド")) out[2]++;
+                else if (name.contains("改")) out[1]++;
+                else if (name.equals("召喚獣")) out[0]++;
+            }
+        } catch (Exception ignored) { } finally { if (c != null) c.disconnect(); }
+        return out;
     }
 
     private String liveOfUser(String uid) {
@@ -521,7 +631,8 @@ public class MainActivity extends Activity {
         for (String[] t : top) {
             if (t[4].isEmpty()) continue;
             if (!next.contains(t[4])) next.add(t[4]);
-            lab.put(t[4], t[0] + "位 " + t[2] + " " + nf.format(Long.parseLong(t[3])) + "pt");
+            String sm; synchronized (smText) { sm = smText.get(t[4]); }
+            lab.put(t[4], t[0] + "位 " + t[2] + " " + nf.format(Long.parseLong(t[3])) + "pt" + (sm == null ? "" : sm));
         }
         boolean same = next.equals(tracked);
         tracked.clear(); tracked.addAll(next);
@@ -539,6 +650,7 @@ public class MainActivity extends Activity {
     /* ギフト・ログイン用の全面ウィンドウ(ログイン状態は枠と共通) */
     private void openOverlay(String title, String url) {
         closeOverlay();
+        overlayIsLogin = title.startsWith("ログイン");
         overlay = new FrameLayout(this);
         overlay.setBackgroundColor(0xFF0F1420);
         overlay.setClickable(true);
@@ -554,15 +666,31 @@ public class MainActivity extends Activity {
         col.addView(top, new LinearLayout.LayoutParams(-1, -2));
         overlayWeb = new WebView(this);
         configure(overlayWeb, false);   // ログイン・ギフトは、そのままのスマホ表示(UAを偽らない)
-        overlayWeb.setWebViewClient(new WebViewClient());
+        overlayWeb.setWebViewClient(new WebViewClient() {
+            @Override public void onPageFinished(WebView v, String u) { CookieManager.getInstance().flush(); updateLoginLabel(); }
+        });
         overlayWeb.loadUrl(url);
         col.addView(overlayWeb, new LinearLayout.LayoutParams(-1, 0, 1));
         overlay.addView(col, new FrameLayout.LayoutParams(-1, -1));
         root.addView(overlay, new FrameLayout.LayoutParams(-1, -1));
     }
 
+    private boolean overlayIsLogin = false;
+
+    private boolean loggedIn() {
+        String c = CookieManager.getInstance().getCookie("https://www.nicovideo.jp");
+        return c != null && c.contains("user_session=") && !c.contains("user_session=deleted");
+    }
+
+    private void updateLoginLabel() { if (loginBtn != null) loginBtn.setText(loggedIn() ? "ログイン済" : "ログイン"); }
+
     private void closeOverlay() {
         if (overlay == null) return;
+        CookieManager.getInstance().flush();
+        boolean wasLogin = overlayIsLogin; overlayIsLogin = false;
+        if (wasLogin) {   // ログイン後は、すでに開いている枠も読み込み直して、ログイン状態にする
+            ui.post(() -> { updateLoginLabel(); for (WebView w : webs.values()) w.reload(); });
+        }
         root.removeView(overlay);
         if (overlayWeb != null) { overlayWeb.stopLoading(); overlayWeb.destroy(); }
         overlay = null; overlayWeb = null;
@@ -580,6 +708,7 @@ public class MainActivity extends Activity {
 
     @Override public void onBackPressed() {
         if (overlay != null) { closeOverlay(); return; }
+        if (!focusId.isEmpty()) { focusId = ""; rebuild(); return; }
         if (full) { setFull(false); return; }
         super.onBackPressed();
     }

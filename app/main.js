@@ -101,7 +101,8 @@ const applyVol = (id, wc) => {
 };
 const applyMode = wc => {
   if (wc.isDestroyed()) return;
-  wc.executeJavaScript(`window.__nmvOn=${playerOnly ? 'true' : 'false'}; window.__nmvUpd && window.__nmvUpd();`).catch(() => {});
+  const on = playerOnly;
+  wc.executeJavaScript(`window.__nmvOn=${on ? 'true' : 'false'}; window.__nmvUpd && window.__nmvUpd();`).catch(() => {});
 };
 
 /* ------------------------------------------------------------------ *
@@ -174,8 +175,8 @@ function createWindow() {
   });
   win.setMenuBarVisibility(false);
   hookFsKeys(win.webContents);
-  win.on('enter-full-screen', () => { if (win) win.webContents.send('mv:fs', true); exitBarStart(); });
-  win.on('leave-full-screen', () => { exitBarStop(); if (win) win.webContents.send('mv:fs', false); });
+  win.on('enter-full-screen', () => { if (win) win.webContents.send('mv:fs', true); exitBarSync(); });
+  win.on('leave-full-screen', () => { exitBarSync(); if (win) win.webContents.send('mv:fs', false); });
   win.loadFile(path.join(__dirname, 'ui.html'));
   win.on('closed', () => {
     win = null; views.clear();
@@ -190,14 +191,21 @@ function hookFsKeys(wc) {
   wc.on('before-input-event', (e, input) => {
     if (input.type !== 'keyDown') return;
     if (input.key === 'F11') { e.preventDefault(); setFs(); }
+    else if (input.key === 'F10') { e.preventDefault(); if (win && !win.isDestroyed()) win.webContents.send('mv:clean', !cleanOn); }
     else if (input.key === 'Escape' && win && win.isFullScreen()) { e.preventDefault(); setFs(false); }
     else if (input.key === 'Escape' && win && !win.isDestroyed()) win.webContents.send('mv:unfocus');
   });
 }
 // 全画面中、画面の一番上にカーソルが行くと「✕ 全画面を終了」ボタンを出す(映像のビューはマウスを奪うので、カーソル位置を定期的に調べる)
-let exitView = null, exitShown = false, exitTimer = null;
-const EXIT_W = 190, EXIT_H = 44;
+let exitView = null, exitShown = false, exitTimer = null, cleanOn = false;
+const EXIT_W = 230, EXIT_H = 44;
 const EXIT_HTML = '<!doctype html><meta charset="utf-8"><style>html,body{margin:0;height:100%;background:transparent;overflow:hidden}button{width:100%;height:100%;box-sizing:border-box;font:700 14px "Yu Gothic UI","Meiryo",sans-serif;color:#fff;background:#1b1f27ee;border:1px solid #ffffff55;border-radius:0 0 10px 10px;border-top:0;cursor:pointer}button:hover{background:#c0392bee}</style><button id="b" type="button">✕ 全画面を終了</button><script>document.getElementById("b").onclick=()=>window.exitFs()</script>';
+// 全画面か「枠のみ表示」のどちらかがONのあいだ、一番上にカーソルを持っていくと戻るボタンを出す
+const exitWanted = () => !!(win && !win.isDestroyed() && (win.isFullScreen() || cleanOn));
+function exitLabel() {
+  const fs = win && win.isFullScreen();
+  return fs && cleanOn ? '✕ 元の表示に戻す' : fs ? '✕ 全画面を終了' : '✕ 枠のみ表示をやめる';
+}
 function exitBarStop() {
   if (exitTimer) { clearInterval(exitTimer); exitTimer = null; }
   if (exitView && exitShown && win && !win.isDestroyed()) { try { win.contentView.removeChildView(exitView); } catch {} }
@@ -210,14 +218,17 @@ function exitBarStart() {
     exitView.setBackgroundColor('#00000000');
     exitView.webContents.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(EXIT_HTML));
   }
+  let shownLabel = '';
   exitTimer = setInterval(() => {
-    if (!win || win.isDestroyed() || !win.isFullScreen()) { exitBarStop(); return; }
+    if (!exitWanted()) { exitBarStop(); return; }
     const cb = win.getContentBounds(), p = screen.getCursorScreenPoint();
     const rx = p.x - cb.x, ry = p.y - cb.y;
     const inWin = rx >= 0 && rx < cb.width && ry >= 0;
     const mid = cb.width / 2;
     const near = inWin && ry <= (exitShown ? EXIT_H + 8 : 4) && (!exitShown || Math.abs(rx - mid) <= EXIT_W / 2 + 40 || ry <= 4);
     if (near && !exitShown) {
+      const lb = exitLabel();
+      if (lb !== shownLabel) { shownLabel = lb; exitView.webContents.executeJavaScript('document.getElementById("b").textContent=' + JSON.stringify(lb)).catch(() => {}); }
       exitView.setBounds({ x: Math.round(mid - EXIT_W / 2), y: 0, width: EXIT_W, height: EXIT_H });
       win.contentView.addChildView(exitView); exitShown = true;
     } else if (near && exitShown) {
@@ -227,6 +238,12 @@ function exitBarStart() {
     }
   }, 120);
 }
+function exitBarSync() { if (exitWanted()) exitBarStart(); else exitBarStop(); }
+ipcMain.on('mv:clean-state', (_e, on) => { cleanOn = !!on; exitBarSync(); });
+ipcMain.on('mv:exit-all', () => {
+  if (win && !win.isDestroyed() && win.isFullScreen()) setFs(false);
+  if (cleanOn && win && !win.isDestroyed()) win.webContents.send('mv:clean', false);
+});
 ipcMain.on('mv:vdbl', e => {
   for (const [id, v] of views) if (v.webContents === e.sender && win) { win.webContents.send('mv:focus', id); break; }
 });
@@ -256,6 +273,7 @@ function makeView(id) {
     wc.executeJavaScript(PLAYER_JS).then(() => { applyMode(wc); applyVol(id, wc); applyHide(id, wc); }).catch(() => {});
     sendInfo(id, wc);
   });
+  wc.on('did-start-navigation', (_e, _u, _inPlace, isMain) => { if (isMain) watchReady(id, wc); });
   wc.loadURL(WATCH(id));
   setTimeout(raiseMenu, 0);
   return view;
@@ -290,7 +308,7 @@ function syncViews(rects, audioId, wantPlayerOnly, vols, hides) {
     if (!want.has(id)) {
       win.contentView.removeChildView(v);
       v.webContents.close();
-      views.delete(id);
+      views.delete(id); readyIds.delete(id);
       pushSources();
     }
   }
@@ -312,6 +330,25 @@ function syncViews(rects, audioId, wantPlayerOnly, vols, hides) {
   applyOverlay();
 }
 
+// 「プレイヤーだけ表示」の準備ができるまで、映像のビューを隠して「読み込み中…」を見せる
+const readyIds = new Set();
+function watchReady(id, wc) {
+  readyIds.delete(id); applyOverlay();
+  const t0 = Date.now();
+  const iv = setInterval(async () => {
+    if (wc.isDestroyed() || !views.has(id) || views.get(id).webContents !== wc) return clearInterval(iv);
+    let ok = false;
+    try {
+      ok = await wc.executeJavaScript(playerOnly
+        ? "document.documentElement.classList.contains('nmv')"
+        : "document.readyState === 'complete'");
+    } catch { /* 読み込み中 */ }
+    if (ok || Date.now() - t0 > 25000) {   // 25秒たっても準備できなければ、そのまま表示する
+      clearInterval(iv);
+      setTimeout(() => { if (!wc.isDestroyed()) { readyIds.add(id); applyOverlay(); } }, 250);
+    }
+  }, 300);
+}
 const reloadAll = () => { for (const [id, v] of views) v.webContents.loadURL(WATCH(id)); };
 
 /* ------------------------------------------------------------------ *
@@ -677,6 +714,7 @@ async function summonsOf(lv) {
   } catch { /* 取れなければ0 */ }
   return out;
 }
+const evLiveCache = new Map(), EV_SLOW_MS = 30000;   // uid → { lv, sm, 取得時刻 }
 ipcMain.handle('mv:ev-top', async (_e, key, n) => {
   if (!KEY_RE.test(String(key))) return { ok: false };
   const lim = Math.min(Math.max(parseInt(n, 10) || 4, 1), 12);
@@ -685,13 +723,27 @@ ipcMain.handle('mv:ev-top', async (_e, key, n) => {
     const list = ((j && j.data && j.data.entry_items) || []).slice(0, lim)
       .map(e => ({ rank: Number(e.rank) || 0, uid: String(e.item_id || ''), name: String(e.name || '').slice(0, 40), score: Number(e.total_score) || 0, icon: imgOk(e.thumbnail_url) }))
       .filter(e => /^\d{1,12}$/.test(e.uid));
-    await Promise.all(list.map(async e => { e.lv = await liveOfUser(e.uid); e.sm = e.lv ? await summonsOf(e.lv) : null; }));
+    // 順位・点数は毎回(10秒ごと)取る。放送中の枠・召喚獣の数は通信が多いので、覚えておいて30秒ごとに取り直す
+    const now = Date.now();
+    await Promise.all(list.map(async e => {
+      let c = evLiveCache.get(e.uid);
+      if (!c || now - c.t > EV_SLOW_MS) {
+        const lv = await liveOfUser(e.uid);
+        c = { t: now, lv, sm: null, smT: 0, smLv: '' };
+        const old = evLiveCache.get(e.uid);
+        if (old && old.lv === lv) { c.sm = old.sm; c.smT = old.smT; c.smLv = old.smLv; }
+        evLiveCache.set(e.uid, c);
+      }
+      if (c.lv && (c.smLv !== c.lv || now - c.smT > EV_SLOW_MS)) { c.sm = await summonsOf(c.lv); c.smT = now; c.smLv = c.lv; }
+      e.lv = c.lv; e.sm = c.lv ? c.sm : null;
+    }));
     return { ok: true, top: list };
   } catch { return { ok: false }; }
 });
+const vidOf = v => { for (const [k, x] of views) if (x === v) return k; return ''; };
 function applyOverlay() {
   for (const v of views.values()) {
-    let show = !drag;
+    let show = !drag && readyIds.has(vidOf(v));
     if (show && overlayOpen) {
       if (!overlayRect) show = false;
       else {
@@ -779,6 +831,53 @@ ipcMain.on('mv:save', (_e, s) => saveState(s));
 ipcMain.on('mv:sync', (_e, rects, audioId, po, vols, hides) => {
   if (Array.isArray(rects)) syncViews(rects, audioId, po, vols, hides);
 });
+/* ------------------------------------------------------------------ *
+ * 🎁 ギフトウィンドウ(別窓)
+ *  上のバーで「投げる先の枠」を選び、その放送のギフトページ(gift.nicovideo.jp)を下に出す。
+ *  ニコニコの公式ギフトを使うだけで、アプリがギフトを代わりに送ることはない。
+ * ------------------------------------------------------------------ */
+let giftWin = null, giftView = null, giftTarget = '', giftTargets = [];
+const GIFT_BAR = 52;
+const GIFT_URL = lv => `https://gift.nicovideo.jp/live/${lv}/purchase?frontend_id=9&frontend_version=658.1.0&item_list_disabled=false`;
+function giftLayout() {
+  if (!giftWin || giftWin.isDestroyed() || !giftView) return;
+  const [w, h] = giftWin.getContentSize();
+  giftView.setBounds({ x: 0, y: GIFT_BAR, width: w, height: Math.max(0, h - GIFT_BAR) });
+}
+function giftPush() { if (giftWin && !giftWin.isDestroyed()) giftWin.webContents.send('gift:state', giftTargets, giftTarget); }
+function giftLoad(id) {
+  giftTarget = ID_RE.test(String(id)) ? String(id) : '';
+  giftPush();
+  if (!giftView || giftView.webContents.isDestroyed()) return;
+  if (!giftTarget) { giftView.webContents.loadURL('about:blank'); return; }
+  const wc = giftView.webContents;
+  wc.loadURL(GIFT_URL(giftTarget)).catch(() => {});
+}
+function openGift(id) {
+  if (giftWin && !giftWin.isDestroyed()) { giftWin.show(); giftWin.focus(); giftLoad(id || giftTarget); return; }
+  giftWin = new BrowserWindow({
+    width: 560, height: 860, minWidth: 380, minHeight: 420,
+    title: 'ギフト', icon: path.join(__dirname, 'icon.png'), autoHideMenuBar: true, backgroundColor: bgColor(),
+    webPreferences: { preload: path.join(__dirname, 'gift-preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
+  });
+  giftWin.setMenuBarVisibility(false);
+  giftWin.loadFile(path.join(__dirname, 'gift.html'));
+  giftView = new WebContentsView({ webPreferences: { partition: PARTITION, contextIsolation: true, nodeIntegration: false, sandbox: true } });
+  giftWin.contentView.addChildView(giftView);
+  giftView.webContents.setWindowOpenHandler(({ url }) => { if (/^https:\/\//.test(url)) giftView.webContents.loadURL(url).catch(() => {}); return { action: 'deny' }; });
+  giftWin.on('resize', giftLayout);
+  giftWin.webContents.once('did-finish-load', () => { giftLayout(); giftLoad(id); });
+  giftWin.on('closed', () => { giftWin = null; giftView = null; });
+}
+ipcMain.on('mv:gift-open', (_e, id) => openGift(id));
+ipcMain.on('mv:gift-targets', (_e, list) => {
+  giftTargets = Array.isArray(list) ? list.filter(x => x && ID_RE.test(String(x.id))).map(x => ({ id: String(x.id), name: String(x.name || x.id).slice(0, 60) })) : [];
+  if (giftTarget && !giftTargets.some(t => t.id === giftTarget)) { giftTarget = ''; if (giftView && !giftView.webContents.isDestroyed()) giftView.webContents.loadURL('about:blank'); }
+  giftPush();
+});
+ipcMain.on('gift:pick', (_e, id) => giftLoad(id));
+ipcMain.on('gift:ready', () => giftPush());
+ipcMain.on('gift:reopen', () => { if (giftTarget) giftLoad(giftTarget); });
 ipcMain.on('mv:reload', (_e, id) => { const v = views.get(id); if (v) v.webContents.loadURL(WATCH(id)); });
 ipcMain.on('mv:external', (_e, id) => { if (ID_RE.test(id)) shell.openExternal(WATCH(id)); });
 ipcMain.handle('mv:auth', () => isLoggedIn().catch(() => false));

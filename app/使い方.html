@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="light">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ニコ生マルチビュー 使い方</title>
+<style>
+:root{--bg:#f4f6fa;--panel:#fff;--line:#d3d9e3;--text:#1a1f2b;--sub:#5b6577;--accent:#1a73e8;--chip:#eef1f6;--tip:#e8f1fe;--tipline:#a9c8f5;--warn:#fff7e0;--warnline:#e6cf8a;color-scheme:light}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:16px}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Yu Gothic UI","Meiryo","Hiragino Sans",sans-serif;font-size:15.5px;line-height:1.8}
+.layout{max-width:1060px;margin:0 auto;padding:24px 18px 60px;display:grid;grid-template-columns:210px 1fr;gap:28px}
+@media (max-width:760px){.layout{grid-template-columns:1fr}}
+nav{position:sticky;top:16px;align-self:start;font-size:14px}
+@media (max-width:760px){nav{position:static}}
+nav b{display:block;margin-bottom:6px;color:var(--sub);font-size:12px;letter-spacing:.08em}
+nav a{display:block;padding:5px 10px;color:var(--text);text-decoration:none;border-radius:6px;border-left:3px solid transparent}
+nav a:hover{background:var(--chip);border-left-color:var(--accent)}
+h1{font-size:28px;margin:0 0 4px}
+.lead{color:var(--sub);margin:0 0 22px}
+section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 24px;margin:0 0 16px}
+h2{font-size:19px;margin:0 0 10px}
+h3{font-size:15.5px;margin:16px 0 4px}
+p{margin:6px 0}
+ul{margin:6px 0;padding-left:1.3em}
+li{margin:4px 0}
+kbd,code{font-family:ui-monospace,Consolas,monospace;font-size:.9em;background:var(--chip);border:1px solid var(--line);padding:1px 7px;border-radius:5px}
+.tip,.warn{border-radius:8px;padding:10px 14px;margin:12px 0 4px;font-size:14.5px}
+.tip{background:var(--tip);border:1px solid var(--tipline)}
+.warn{background:var(--warn);border:1px solid var(--warnline)}
+table{border-collapse:collapse;width:100%;font-size:14.5px;margin:8px 0}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--sub);font-weight:600;font-size:13px}
+td:first-child{white-space:nowrap;width:1%;font-size:16px}
+.steps{counter-reset:s;list-style:none;padding:0}
+.steps li{counter-increment:s;position:relative;padding-left:38px;margin:10px 0}
+.steps li::before{content:counter(s);position:absolute;left:0;top:1px;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:700;font-size:14px}
+.gold{color:#b88600;font-weight:700}.silver{color:#7b8591;font-weight:700}.bronze{color:#a8601f;font-weight:700}
+footer{color:var(--sub);font-size:13px;margin-top:20px}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav aria-label="目次">
+  <b>目次</b>
+  <a href="#start">起動する</a>
+  <a href="#add">放送を追加する</a>
+  <a href="#head">枠のヘッダのボタン</a>
+  <a href="#sound">音声と全画面</a>
+  <a href="#save">枠の保存</a>
+  <a href="#gift">ギフトイベント</a>
+  <a href="#login">ログイン・コメント</a>
+  <a href="#viewer">コメントビューア</a>
+  <a href="#view">表示の設定</a>
+  <a href="#notes">注意事項</a>
+</nav>
+<main>
+  <h1>ニコ生マルチビュー 使い方</h1>
+  <p class="lead">ニコ生を複数の窓で同時に見るアプリです(非公式)。</p>
+
+  <section id="start">
+    <h2>起動する</h2>
+    <ol class="steps">
+      <li>zip を好きな場所に<b>展開</b>します(zip の中からは起動できません)。</li>
+      <li>フォルダの中の <code>NicoMultiView.exe</code> をダブルクリックします。</li>
+      <li>Windows が「PCが保護されました」と出したら、<b>「詳細情報」→「実行」</b>で起動できます(署名していないためです)。</li>
+    </ol>
+    <div class="warn">フォルダの中のファイルは移動・削除しないでください。exe だけを別の場所へ移すと動きません。アンインストールは、フォルダごと削除するだけです。</div>
+  </section>
+
+  <section id="add">
+    <h2>放送を追加する</h2>
+    <p>最大 12 枠まで同時に表示できます。追加の方法は 4 つあります。</p>
+    <ul>
+      <li><b>放送者名で検索:</b> 上の入力欄に名前を入れると、放送中の枠が候補に出ます。クリック(または <kbd>↑</kbd><kbd>↓</kbd> と <kbd>Enter</kbd>)で追加。候補は開いたままなので続けて追加でき、<kbd>Esc</kbd> か外側のクリックで閉じます。</li>
+      <li><b>lv番号・URLを貼る:</b> <code>lv123456789</code> や放送URLを貼って「追加」。複数まとめて貼っても追加できます。</li>
+      <li><b>リンクをドラッグ:</b> ブラウザで開いている放送のリンク(URLやタブ)を、アプリの枠の上へドラッグ&ドロップ。</li>
+      <li><b>ギフトイベント・保存した枠から:</b> 後の項目を見てください。</li>
+    </ul>
+    <div class="tip">名前の検索は、ニコニコのユーザー検索で名前を探し、<b>いま放送中の枠があるユーザー</b>だけを出します。放送していない人は出ません。候補は、名前が一致するものが先、そのあとは来場者数の多い順です。</div>
+  </section>
+
+  <section id="head">
+    <h2>枠のヘッダのボタン</h2>
+    <p>各枠の上のバーにあります。名前の部分をつかんでドラッグすると、枠を並べ替えられます(映像そのものをドラッグしても動かせます)。</p>
+    <table>
+      <tr><th>操作</th><th>はたらき</th></tr>
+      <tr><td>スライダー</td><td>その枠の音量</td></tr>
+      <tr><td>🔊 / 🔇</td><td>その枠の音声の ON / OFF。複数の枠を同時に ON にできます</td></tr>
+      <tr><td>⏪</td><td>10 秒戻す(タイムシフトは<b>ニコ生プレミアム会員のみ</b>)</td></tr>
+      <tr><td>LIVE</td><td>現在のライブに戻る</td></tr>
+      <tr><td>💬</td><td>その枠の、映像に流れるコメントを非表示 / 表示</td></tr>
+      <tr><td>🎁</td><td>ギフトウィンドウ(別窓)を開く。上のリストで投げる先の枠を切り替えられ、その放送のギフトページ(購入・贈呈画面)を表示します(ログインが必要です)</td></tr>
+      <tr><td>★</td><td>その枠をメインにする(「メイン + サブ」配置のとき大きく表示)</td></tr>
+      <tr><td>↻</td><td>その枠を読み込み直す(映像や音声が止まったとき)</td></tr>
+      <tr><td>↗</td><td>ブラウザで開く</td></tr>
+      <tr><td>✕</td><td>その枠を閉じる</td></tr>
+    </table>
+    <h3>1つの枠だけを大きく見る</h3>
+    <p>映像(または枠のヘッダの名前の部分)を<b>ダブルクリック</b>すると、その枠だけを表示します。もう一度ダブルクリックするか <kbd>Esc</kbd> を押すと、元の表示に戻ります。ほかの枠は隠れるだけで、読み込みは続きます。</p>
+    <p>枠にマウスを乗せると、映像の下端にシークバーが出ます。ラベルには放送者名が出て(取得できるまでは lv番号)、マウスを乗せると番組名が出ます。</p>
+  </section>
+
+  <section id="sound">
+    <h2>音声と全画面</h2>
+    <h3>最初はミュートで始まります</h3>
+    <p>複数のURLをまとめて貼ったとき、保存した枠を呼び出したとき、ギフトイベントを表示したときは、<b>全ての枠がミュート</b>で始まります。聞きたい枠の 🔊 を押して、自分でオンにします。1 枠だけ追加して、ほかに音声がオンの枠がないときは、その枠がオンになります。</p>
+    <h3>全て消音 / 全て音声ON</h3>
+    <p>ツールバーのボタンで一括切り替えできます。1 枠でも音声がオンなら「全て消音」で全部オフに、全部オフなら「全て音声ON」で全部オンになります。</p>
+    <h3>枠のみ表示</h3>
+    <p>ツールバーの「枠のみ」ボタンか <kbd>F10</kbd> で、上の操作バー(「ニコ生マルチビュー」の行)だけを隠して、枠を広く表示します。各枠のヘッダ(音量・🎁など)とコメント欄はそのまま使えます。全画面ではなく、ふつうのウィンドウのままです。</p>
+    <ul>
+      <li>戻るには、画面の<b>一番上にカーソルを持っていく</b>と出る「✕ 枠のみ表示をやめる」ボタンを押すか、もう一度 <kbd>F10</kbd> を押します。</li>
+      <li>ONのあいだは、枠ごとの音量やミュートは操作できません。先に音声のON/OFFを決めてからONにしてください。</li>
+      <li>映像のドラッグでの並べ替えと、ダブルクリックでの1枠表示は使えます(「プレイヤーのみ」がONのとき)。</li>
+      <li>全画面と同時にONにもできます(そのときは「✕ 元の表示に戻す」が出ます)。</li>
+    </ul>
+    <h3>全画面</h3>
+    <p>「⛶ 全画面」ボタンか <kbd>F11</kbd> で、検索窓やボタンのバーを隠して、枠だけを全画面で表示します。</p>
+    <ul>
+      <li>戻るには、画面の<b>一番上にカーソルを持っていく</b>と出る「✕ 全画面を終了」ボタンを押します。</li>
+      <li><kbd>Esc</kbd> または <kbd>F11</kbd> でも戻れます。</li>
+    </ul>
+  </section>
+
+  <section id="save">
+    <h2>枠の保存</h2>
+    <ul>
+      <li>「📁 枠の保存」で、いま開いている枠に名前をつけて保存します。</li>
+      <li>一覧の「開く」で呼び出します(いまの枠は置き換わります)。「削除」で消去します。</li>
+      <li>ギフトイベントの追跡を始めると、いま開いている枠はすべて閉じます。そのとき、保存するかどうかを聞きます。</li>
+    </ul>
+  </section>
+
+  <section id="gift">
+    <h2>ギフトイベントの上位者を自動表示</h2>
+    <ol class="steps">
+      <li>「🎁 ギフトイベント」を押すと、開催中のイベント一覧が出ます(ギフトが先)。一覧にないイベントは、イベントのキーまたは audition.nicovideo.jp のURLを貼って「追加」します。</li>
+      <li>表示する順位(上位 1〜12 位)を選んで、イベントを押すと追跡が始まります。</li>
+      <li>上位者のうち<b>いま放送中の人</b>の枠が順位順に並び、ラベルに「1位 名前 ポイント」が出ます。</li>
+    </ol>
+    <ul>
+      <li>10 秒ごとに順位と点数を取り直し(ニコニコ側の更新も10秒ごとです)、入れ替わると枠も自動で入れ替わります。放送中かどうかと召喚獣の数は、30 秒ごとに取り直します。手で追加した枠は、そのうしろに残ります。</li>
+      <li><span class="gold">1位=金</span>・<span class="silver">2位=銀</span>・<span class="bronze">3位=銅</span>の色で、枠のふちとバッジが色分けされます。</li>
+      <li>ラベルには、その放送の召喚獣の数(召=通常 / 改 / 神)も出ます。</li>
+      <li>追跡を始めると、配置は自動グリッドになります。</li>
+      <li>追跡をやめるには、ツールバーの「🎁 …」表示の ✕ を押します(枠はそのまま残ります)。</li>
+    </ul>
+    <div class="tip">順位はニコニコ公式のイベント情報を使います。ログインは要りません。</div>
+  </section>
+
+  <section id="login">
+    <h2>ログイン・コメント</h2>
+    <ul>
+      <li>右上の「ニコニコにログイン」から、ニコニコ公式のログイン画面でログインします。ID・パスワードはアプリに保存されません。</li>
+      <li>各枠の下の入力欄に書いて <kbd>Enter</kbd> で送信します。</li>
+      <li>「184」にチェックすると、投稿者名を出さずに送信します。</li>
+      <li>「コメント欄」で、入力欄の表示を切り替えます。</li>
+    </ul>
+  </section>
+
+  <section id="viewer">
+    <h2>統合コメントビューア</h2>
+    <ul>
+      <li>「コメントビューア」ボタンで別窓が開き、全枠のコメントが時系列にまとまって流れます。</li>
+      <li>放送者ごとに色分け。放送ごとの表示 / 非表示、検索、文字サイズ、最前面表示が使えます。</li>
+      <li>位置と大きさは、閉じても次回に引き継がれます。</li>
+    </ul>
+    <div class="warn">集められるのは、コメント番号のついた通常のコメントです(広告・お知らせは対象外)。枠が小さすぎると、ニコ生側のコメント一覧が表示されず、集まらないことがあります。</div>
+  </section>
+
+  <section id="view">
+    <h2>表示の設定</h2>
+    <ul>
+      <li><b>配置:</b> 自動グリッド / メイン + サブ / 横一列 / 縦一列</li>
+      <li><b>テーマ:</b> 自動(OSに合わせる)/ ライト / ダーク</li>
+      <li><b>プレイヤーのみ</b>(初期は ON): 視聴ページの映像とコメントだけを、枠いっぱいに表示します。OFF にすると視聴ページ全体を表示します。</li>
+      <li>並び・配置・音量・テーマなどは、次回起動時も保たれます。</li>
+    </ul>
+  </section>
+
+  <section id="notes">
+    <h2>注意事項</h2>
+    <ul>
+      <li>個人が作った<b>非公式</b>のツールです。ドワンゴ・KADOKAWA および「ニコニコ」サービスとは関係ありません。</li>
+      <li>ニコニコ側の仕様が変わると、一部の機能が使えなくなることがあります。</li>
+      <li>現状のまま提供され、利用による損害について作者は責任を負いません。自己責任でご利用ください。</li>
+      <li>映像・コメントなどの権利は配信者・投稿者にあります。録画・転載・再配信は、配信者の許可と各サービスの規約に従ってください。</li>
+      <li>このフォルダの <code>LICENSE.electron.txt</code> と <code>LICENSES.chromium.html</code> は、Electron と Chromium のライセンスです。削除しないでください。</li>
+    </ul>
+  </section>
+  <footer>ニコ生マルチビュー ― 非公式ツール</footer>
+</main>
+</div>
+</body>
+</html>

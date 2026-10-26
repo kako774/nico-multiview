@@ -56,9 +56,12 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--o
 .sm{display:inline-flex;gap:3px;margin-left:5px;vertical-align:middle}
 .sm i{font-style:normal;font-size:10px;font-weight:800;padding:0 3px;border-radius:5px;color:#fff}
 .sm{margin-left:3px;gap:2px}
-.head button.live{font-weight:800;font-size:11px;letter-spacing:.03em;color:#fff;background:#d93025;border-color:#d93025}
+.head button.live{font-weight:800;font-size:13px;letter-spacing:.03em;color:#fff;background:#d93025;border-color:#d93025}
 .head button.live:hover{filter:brightness(1.1)}
-.tile.rkd .head{flex:0 0 auto;flex-wrap:wrap;row-gap:2px;padding:2px 4px}.tile.rkd .tag{min-width:11em}.tile.rkd .tag .tt{min-width:3em}
+.tile.rkd .tag{flex:0 1 auto;min-width:8em}.tile.rkd .tag .tt{min-width:2em}
+.tile{container-type:inline-size}
+@container (max-width:620px){.head .vol,.head .volv{display:none}}
+@container (max-width:460px){.head button.rw,.head .grow{display:none}}
 .sm .n{background:#8e57d9}.sm .k{background:#e8782a}.sm .g{background:linear-gradient(90deg,#e0457b,#e8b923,#3fb6d9)}
 .sm i.z{opacity:.35}
 .tag{display:inline-flex;align-items:center;min-width:0}.tag .tt{overflow:hidden;text-overflow:ellipsis}.tag .rk,.tag .sm{flex:none}
@@ -69,7 +72,7 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--o
 .row2 input[type=text]{flex:1;min-width:180px}
 #msg{font-size:12px;color:var(--sub);width:100%;display:none}
 #msg.show{display:block}#msg.err{color:var(--danger)}
-body.fs #bar{display:none}
+body.fs #bar,body.clean #bar{display:none}
 #wrap{position:relative;flex:1 1 auto;min-height:0;background:var(--stagebg)}
 #stage{position:absolute;inset:0;display:grid;gap:4px;padding:4px}
 .tile{display:flex;flex-direction:column;min-width:0;min-height:0;border:1px solid var(--line);border-radius:4px;background:var(--tilebg);overflow:hidden}
@@ -83,17 +86,19 @@ body.dragmode .content{display:flex;align-items:center;justify-content:center;fo
 body.dragmode .content::after{content:attr(data-label);word-break:break-all}
 body.dragmode .tile.dragover .content{color:var(--text);background:var(--dragon)}
 body.dragmode .tile.dragsrc .content::after{content:attr(data-label) "\A(移動中)";white-space:pre}
-.head{flex:0 0 26px;display:flex;gap:4px;align-items:center;padding:0 4px;background:var(--panel);border-bottom:1px solid var(--line)}
+.head{flex:0 0 36px;overflow:hidden;font-size:15px;display:flex;gap:5px;align-items:center;padding:0 6px;background:var(--panel);border-bottom:1px solid var(--line)}
 .head button.cm.off{opacity:.55;text-decoration:line-through}
 .vol{width:110px;height:14px;accent-color:var(--accent);cursor:pointer;flex:0 1 110px;min-width:28px;margin:0 2px}
 .volv{font-size:11px;color:var(--sub);min-width:3em;text-align:right;font-variant-numeric:tabular-nums;flex:0 0 auto}
-.tag{font-size:12px;font-weight:700;padding:1px 7px;border-radius:5px;background:var(--tagbg);cursor:grab;
+.tag{font-size:14px;font-weight:700;padding:1px 7px;border-radius:5px;background:var(--tagbg);cursor:grab;
   min-width:3.6em;max-width:none;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .head .grow{flex:1;min-width:0}
-.head button{flex:0 0 auto;padding:1px 8px;font-size:12px;border-radius:5px;white-space:nowrap}
+.head button{flex:0 0 auto;padding:4px 9px;font-size:15px;border-radius:5px;white-space:nowrap}
 .head button.on{border-color:var(--accent);color:var(--accent)}
 .head button.close:hover{border-color:var(--danger);color:var(--danger)}
-.content{flex:1 1 auto;min-height:0}
+.content{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center}
+.content::before{content:'読み込み中…';color:var(--sub);font-size:15px}
+body.dragmode .content::before{display:none}
 .foot{flex:0 0 32px;display:none;gap:4px;align-items:center;padding:3px 4px;background:var(--panel);border-top:1px solid var(--line)}
 body.showCmt .foot{display:flex}
 .foot input{flex:1;padding:3px 8px;font-size:13px;border-radius:6px}
@@ -126,6 +131,7 @@ body.showCmt .foot{display:flex}
   <label class="chk" title="各枠の下にコメント入力欄を出します"><input id="showCmt" type="checkbox" checked>コメント欄</label>
   <label class="chk" title="184(投稿者を表示しない)でコメントします"><input id="use184" type="checkbox">184</label>
   <button id="muteAll" type="button" title="全枠の音声を一括でOFF / ON">全て消音</button>
+  <button id="cleanBtn" type="button" title="検索窓・ボタン・音量・コメント欄を隠して、映像の枠だけを表示します(F10)。画面の一番上にカーソルを持っていくと戻るボタンが出ます">枠のみ</button>
   <button id="fsBtn" type="button" title="全画面(F11)。上のバーを隠して、枠だけを全画面で表示します。Escで戻ります">⛶ 全画面</button>
   <button id="ppBtn" type="button" title="いま開いている枠を保存/呼び出し">📁 枠の保存</button>
   <button id="evBtn" type="button" title="ギフトイベントの上位者の放送を自動で並べる">🎁 ギフトイベント</button>
@@ -214,6 +220,12 @@ body.showCmt .foot{display:flex}
   /* ---------- 配置 ---------- */
   // ダブルクリックでその枠だけを表示(もう一度ダブルクリック / Escで元に戻る)
   let focusId = '';
+  let cleanMode = false;   // 「枠のみ」表示(上の操作バーだけ隠す)。保存はしない
+  function setClean(on) {
+    cleanMode = !!on; document.body.classList.toggle('clean', cleanMode);
+    $('#cleanBtn').classList.toggle('on', cleanMode); window.mv.cleanState(cleanMode);
+    layoutNow(); setTimeout(layoutNow, 150);
+  }
   function toggleFocus(id) {
     if (focusId === id) { focusId = ''; say('元の表示に戻しました'); }
     else if (items.includes(id)) { focusId = id; say(`${nameOf(id)} だけを表示中(もう一度ダブルクリックかEscで戻る)`); }
@@ -235,7 +247,7 @@ body.showCmt .foot{display:flex}
     else if (layout === 'main' && n >= 2) { stage.style.gridTemplateColumns = '3fr 1fr'; stage.style.gridTemplateRows = `repeat(${n - 1},1fr)`; }
     else {
       const w = stage.clientWidth || innerWidth, h = stage.clientHeight || innerHeight;
-      const chrome = 27 + (showCmt ? 33 : 0);   // 各枠のヘッダ(+コメント欄)の高さ
+      const chrome = 37 + (showCmt ? 33 : 0);   // 各枠のヘッダ(+コメント欄)の高さ
       let best = 1, bestScore = Infinity;
       for (let c = 1; c <= n; c++) {
         const r = Math.ceil(n / c);
@@ -260,6 +272,7 @@ body.showCmt .foot{display:flex}
       return { id: t.dataset.id, x: r.left, y: r.top, w: r.width, h: r.height };
     });
     window.mv.sync(rects, audioIds, playerOnly, volumes, hideCmts);
+    window.mv.giftTargets(items.map(id => ({ id, name: nameOf(id) })));
   }
   let raf = 0;
   function layoutNow() { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { applyGrid(); sendRects(); }); }
@@ -302,9 +315,10 @@ body.showCmt .foot{display:flex}
       hideCmts[id] = !hideCmts[id]; cm.classList.toggle('off', !!hideCmts[id]); persist(); layoutNow();
     }, 'cm');
     cm.classList.toggle('off', !!hideCmts[id]);
-    const rw = mk('⏪', '10秒戻す(タイムシフト・プレミアム会員)', () => window.mv.player(id, 'back'));
+    const rw = mk('⏪', '10秒戻す(タイムシフト・プレミアム会員)', () => window.mv.player(id, 'back'), 'rw');
     const lv = mk('LIVE', '現在のライブに戻る', () => window.mv.player(id, 'live'), 'live');
     head.append(tag, grow, vol, volv, rw, lv, snd, cm,
+      mk('🎁', 'この枠にギフトを贈る(ギフトウィンドウが開きます)', () => window.mv.giftOpen(id), 'giftbtn'),
       mk('★', 'メインにする(この枠を先頭・大きい枠へ)', () => {
         items = [id, ...items.filter(x => x !== id)]; if (layout === 'auto') layout = 'main'; render();
       }),
@@ -461,6 +475,9 @@ body.showCmt .foot{display:flex}
   a184.addEventListener('change', () => { use184 = a184.checked; persist(); });
   $('#muteAll').addEventListener('click', () => { audioIds = audioIds.length ? [] : items.slice(); render(); });
   $('#fsBtn').addEventListener('click', () => window.mv.fullscreen());
+  $('#cleanBtn').addEventListener('click', () => setClean(!cleanMode));
+  window.mv.onClean(on => setClean(on));
+  document.addEventListener('keydown', e => { if (e.key === 'F10') { e.preventDefault(); setClean(!cleanMode); } });
   window.mv.onFullscreen(on => { document.body.classList.toggle('fs', on); layoutNow(); setTimeout(layoutNow, 150); });
   const themeSel = $('#theme');
   themeSel.addEventListener('change', () => { theme = themeSel.value; window.mv.setTheme(theme); persist(); });
@@ -585,7 +602,7 @@ body.showCmt .foot{display:flex}
     items = []; audioIds = []; evLvs = []; ranks.clear(); focusId = '';
     layout = 'auto';   // ギフト表示は自動グリッド
     evTrack = { key: e.key, title: e.title, n: Number(evN) || 4 };
-    evSig = null; render(); renderChip(); persist(); refreshTop(true); clearInterval(evTimer); evTimer = setInterval(() => refreshTop(false), 60000);
+    evSig = null; render(); renderChip(); persist(); refreshTop(true); clearInterval(evTimer); evTimer = setInterval(() => refreshTop(false), 10000);
   }
   function stopTrack() {
     evGen++; evBusy = false;
@@ -644,7 +661,7 @@ body.showCmt .foot{display:flex}
     if (s && Array.isArray(s.evKeys)) evKeys = s.evKeys.filter(k => /^[\w-]{1,80}$/.test(String(k))).slice(0, 20);
     if (s && s.evTrack && /^[\w-]{1,80}$/.test(String(s.evTrack.key))) {
       evTrack = { key: s.evTrack.key, title: String(s.evTrack.title || '').slice(0, 100), n: Math.min(12, Math.max(1, Number(s.evTrack.n) || 4)) };
-      evN = evTrack.n; evTimer = setInterval(() => refreshTop(false), 60000);
+      evN = evTrack.n; evTimer = setInterval(() => refreshTop(false), 10000);
     }
     render(); renderChip();
     if (evTrack) refreshTop(true);

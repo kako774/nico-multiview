@@ -1,0 +1,36 @@
+name: release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm i --no-save resedit
+      - run: npx electron-builder --win dir --x64
+      - run: node tools/seticon.mjs dist/win-unpacked/NicoMultiView.exe icon.ico
+      - name: フォルダをまとめてZIPにする
+        shell: pwsh
+        run: |
+          $d = 'dist/win-unpacked'
+          Get-ChildItem "$d/locales" -Filter *.pak | Where-Object { $_.Name -notin @('ja.pak','en-US.pak') } | Remove-Item
+          New-Item -ItemType Directory -Force -Path pack | Out-Null
+          Move-Item $d 'pack/NicoMultiView'
+          Copy-Item '使い方.html' 'pack/NicoMultiView/使い方.html'
+          Compress-Archive -Path 'pack/NicoMultiView' -DestinationPath 'NicoMultiView-win.zip' -CompressionLevel Optimal
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: app/NicoMultiView-win.zip
+          name: ${{ github.ref_name }}
+          generate_release_notes: true

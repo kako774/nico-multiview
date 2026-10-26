@@ -1,3 +1,3 @@
 'use strict';
 const { contextBridge, ipcRenderer } = require('electron');
-contextBridge.exposeInMainWorld('exitFs', () => ipcRenderer.send('mv:fullscreen', false));
+contextBridge.exposeInMainWorld('exitFs', () => ipcRenderer.send('mv:exit-all'));

@@ -1,0 +1,12 @@
+import fs from 'fs';
+import * as R from 'resedit';
+const [exe, ico] = process.argv.slice(2);
+const e = R.NtExecutable.from(fs.readFileSync(exe));
+const res = R.NtExecutableResource.from(e);
+const iconFile = R.Data.IconFile.from(fs.readFileSync(ico));
+const groups = R.Resource.IconGroupEntry.fromEntries(res.entries);
+console.log('groups', groups.map(g => [g.id, g.lang]));
+const gid = groups.length ? groups[0].id : 1, lang = groups.length ? groups[0].lang : 1033;
+R.Resource.IconGroupEntry.replaceIconsForResource(res.entries, gid, lang, iconFile.icons.map(i => i.data));
+res.outputResource(e);
+fs.writeFileSync(exe, Buffer.from(e.generate()));

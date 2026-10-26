@@ -36,8 +36,7 @@ import java.util.regex.Pattern;
 
 /** ニコ生マルチビュー(Android版・試作)。ニコ生の視聴ページを、画面を分けて複数同時に表示する。 */
 public class MainActivity extends Activity {
-    private static final String DESKTOP_UA =
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+    private static final Pattern CHROME_VER = Pattern.compile("Chrome/([\\d.]+)");
     private static final Pattern LV = Pattern.compile("lv\\d+", Pattern.CASE_INSENSITIVE);
 
     private final List<String> ids = new ArrayList<>();
@@ -53,6 +52,17 @@ public class MainActivity extends Activity {
     private FrameLayout overlay;
     private WebView overlayWeb;
     private SharedPreferences prefs;
+
+    /** 実際のWebView(Chrome)のバージョンに合わせたUA。偽のバージョンだと、Turnstileなどのボット判定に落ちやすい。 */
+    private String realUa() {
+        String d = WebSettings.getDefaultUserAgent(this);
+        return d.replace("; wv", "").replaceAll(" Version/[\\d.]+", "");
+    }
+    private String desktopUa() {
+        Matcher m = CHROME_VER.matcher(WebSettings.getDefaultUserAgent(this));
+        String v = m.find() ? m.group(1) : "124.0.0.0";
+        return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/" + v + " Safari/537.36";
+    }
 
     private int dp(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }
 
@@ -161,7 +171,7 @@ public class MainActivity extends Activity {
     @SuppressLint({"SetJavaScriptEnabled", "ClickableViewAccessibility"})
     private WebView makeWeb(final String id) {
         WebView w = new WebView(this);
-        configure(w);
+        configure(w, true);
         w.setWebViewClient(new WebViewClient() {
             @Override public void onPageFinished(WebView v, String url) {
                 v.evaluateJavascript(playerJs, null);
@@ -176,12 +186,12 @@ public class MainActivity extends Activity {
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    private void configure(WebView w) {
+    private void configure(WebView w, boolean desktop) {
         WebSettings s = w.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setMediaPlaybackRequiresUserGesture(false);
-        s.setUserAgentString(DESKTOP_UA);
+        s.setUserAgentString(desktop ? desktopUa() : realUa());
         s.setUseWideViewPort(true);
         s.setLoadWithOverviewMode(true);
         w.setBackgroundColor(Color.BLACK);
@@ -283,7 +293,7 @@ public class MainActivity extends Activity {
         top.addView(btn("閉じる", v -> closeOverlay()));
         col.addView(top, new LinearLayout.LayoutParams(-1, -2));
         overlayWeb = new WebView(this);
-        configure(overlayWeb);
+        configure(overlayWeb, false);   // ログイン・ギフトは、そのままのスマホ表示(UAを偽らない)
         overlayWeb.setWebViewClient(new WebViewClient());
         overlayWeb.loadUrl(url);
         col.addView(overlayWeb, new LinearLayout.LayoutParams(-1, 0, 1));

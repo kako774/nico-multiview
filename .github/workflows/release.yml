@@ -1,6 +1,7 @@
 name: release
 on:
   push:
+    branches: [release]
     tags: ['v*']
   workflow_dispatch:
 permissions:
@@ -29,8 +30,15 @@ jobs:
           Move-Item $d 'pack/NicoMultiView'
           Copy-Item '使い方.html' 'pack/NicoMultiView/使い方.html'
           Compress-Archive -Path 'pack/NicoMultiView' -DestinationPath 'NicoMultiView-win.zip' -CompressionLevel Optimal
+      - name: バージョンを読む
+        id: ver
+        shell: pwsh
+        run: |
+          $v = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          "tag=v$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
       - uses: softprops/action-gh-release@v2
         with:
           files: app/NicoMultiView-win.zip
-          name: ${{ github.ref_name }}
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: ${{ steps.ver.outputs.tag }}
           generate_release_notes: true

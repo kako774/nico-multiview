@@ -22,6 +22,8 @@
       "menu.html",
       "menu-preload.js",
       "exit-preload.js",
+      "gift.html",
+      "gift-preload.js",
       "icon.png",
       "package.json"
     ],

@@ -171,21 +171,46 @@ async function prepareUpdate(man) {
   fs.writeFileSync(next, buf);
   return next;
 }
-// このアプリが終わるのを待って入れ替え(元のファイルは .bak に残す)、再起動する
+// このアプリが終わるのを待って入れ替え(元のファイルは .bak に残す)、再起動する。
+// 入れ替えは、このアプリ自身(Electron を Node として起動)に任せる。 PowerShell は、環境によって動かないことがあるため使わない。
+const APPLY_JS = `
+const fs = (() => { try { return require('original-fs'); } catch { return require('fs'); } })();
+const cp = require('child_process');
+const [pid, target, next, exe, res] = process.argv.slice(2);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+(async () => {
+  for (let i = 0; i < 60; i++) { try { process.kill(Number(pid), 0); } catch (e) { break; } await sleep(500); }
+  await sleep(700);
+  let ok = false, err = '';
+  for (let i = 0; i < 40; i++) {
+    try { fs.copyFileSync(target, target + '.bak'); fs.copyFileSync(next, target); try { fs.unlinkSync(next); } catch (e) {} ok = true; break; }
+    catch (e) { err = String(e && e.message || e); await sleep(500); }
+  }
+  try { fs.writeFileSync(res, ok ? 'OK' : 'NG: ' + err); } catch (e) {}
+  try { const env = Object.assign({}, process.env); delete env.ELECTRON_RUN_AS_NODE; const c = cp.spawn(exe, [], { detached: true, stdio: 'ignore', env }); c.unref(); } catch (e) {}
+})();
+`;
 function finishUpdate(next) {
+  const fs = require('fs');
   const target = path.join(process.resourcesPath, 'app.asar');
-  const q = s => "'" + String(s).replace(/'/g, "''") + "'";
-  const ps = [
-    `$ErrorActionPreference='SilentlyContinue'`,
-    `Wait-Process -Id ${process.pid} -Timeout 30`,
-    `for($i=0;$i -lt 20;$i++){ try { Copy-Item -LiteralPath ${q(target)} -Destination ${q(target + '.bak')} -Force -ErrorAction Stop; Move-Item -LiteralPath ${q(next)} -Destination ${q(target)} -Force -ErrorAction Stop; break } catch { Start-Sleep -Milliseconds 500 } }`,
-    `Start-Process -FilePath ${q(process.execPath)}`,
-  ].join('; ');
-  const enc = Buffer.from(ps, 'utf16le').toString('base64');
-  const child = require('child_process').spawn('powershell.exe', ['-NoProfile', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', enc], { detached: true, stdio: 'ignore', windowsHide: true });
+  const dir = path.dirname(next), script = path.join(dir, 'apply.js'), res = path.join(dir, 'result.txt');
+  try { fs.rmSync(res, { force: true }); } catch { /* 無視 */ }
+  fs.writeFileSync(script, APPLY_JS);
+  const env = Object.assign({}, process.env, { ELECTRON_RUN_AS_NODE: '1' });
+  const child = require('child_process').spawn(process.execPath, [script, String(process.pid), target, next, process.execPath, res], { detached: true, stdio: 'ignore', windowsHide: true, env });
   child.on('error', () => {});
   child.unref();
   setTimeout(() => app.quit(), 300);
+}
+// 起動したときに、前回の更新の結果をログへ残す
+function logUpdateResult() {
+  try {
+    const fs = require('fs'), f = path.join(app.getPath('userData'), 'update', 'result.txt');
+    if (!fs.existsSync(f)) return;
+    const t = fs.readFileSync(f, 'utf8').trim(); fs.rmSync(f, { force: true });
+    if (t === 'OK') appLog(`更新を適用しました(v${app.getVersion()})`);
+    else appLog('更新の入れ替えに失敗: ' + t.slice(0, 120), 'ERROR');
+  } catch { /* 無視 */ }
 }
 const msgBox = opts => (win && !win.isDestroyed() ? dialog.showMessageBox(win, opts) : dialog.showMessageBox(opts));
 // 更新の流れ: (確認) → ダウンロードと照合 → 「再起動します」でOK → 入れ替えて再起動
@@ -217,6 +242,8 @@ ipcMain.handle('mv:update-apply', () => runUpdate(updManifest, false));
 let promptedVer = '';
 async function promptUpdate(latest, auto) {
   if (promptedVer === latest || updating) return;
+  await ensurePolicy();   // 利用できない版のときは、その案内だけを出す(更新の案内を2つ重ねない)
+  if (policyShown) return;
   promptedVer = latest;
   if (auto) { runUpdate(updManifest, true); return; }
   const r = await msgBox({ type: 'info', title: 'ニコ生マルチビュー', message: `新しいバージョン(v${latest})があります。`, detail: '配布ページから、新しいZIPをダウンロードしてください。', buttons: ['配布ページを開く', 'あとで'], defaultId: 0, cancelId: 1, noLink: true });
@@ -246,7 +273,8 @@ function loadPolicy() {
   try { const j = JSON.parse(fs.readFileSync(f, 'utf8')); if (verifyPolicy(j)) cached = j; } catch { /* なし */ }
   return { cached, f };
 }
-let policyShown = false;
+let policyShown = false, policyPromise = null;
+function ensurePolicy() { return policyPromise || (policyPromise = checkPolicy().catch(() => {})); }
 async function checkPolicy() {
   if (policyShown) return;
   const fs = require('fs');
@@ -1355,7 +1383,8 @@ ipcMain.on('mv:logout', () => { logout(); });
 app.setAppUserModelId('dev.nico-multiview');
 app.whenReady().then(() => {
   appLog('アプリを起動(v' + app.getVersion() + ')');
-  setTimeout(() => { checkPolicy(); setInterval(checkPolicy, 6 * 3600 * 1000); }, 3000);
+  logUpdateResult();
+  setTimeout(() => { ensurePolicy(); setInterval(checkPolicy, 6 * 3600 * 1000); }, 3000);
   // ログインが完了したら(user_session が付いたら)ログイン画面を閉じて全枠を読み込み直す
   ses().cookies.on('changed', async (_e, cookie, _cause, removed) => {
     if (cookie.name !== 'user_session' || !/(^|\.)nicovideo\.jp$/.test(cookie.domain)) return;

@@ -49,7 +49,8 @@ jobs:
           New-Item -ItemType Directory -Force -Path pack | Out-Null
           Move-Item $d 'pack/NicoMultiView'
           Copy-Item '使い方.html' 'pack/NicoMultiView/使い方.html'
-          Compress-Archive -Path 'pack/NicoMultiView' -DestinationPath 'NicoMultiView-win.zip' -CompressionLevel Optimal
+          $v = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          Compress-Archive -Path 'pack/NicoMultiView' -DestinationPath "NicoMultiView-win-$v.zip" -CompressionLevel Optimal
       - name: バージョンを読む
         id: ver
         shell: pwsh
@@ -59,7 +60,7 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: |
-            app/NicoMultiView-win.zip
+            app/NicoMultiView-win-*.zip
             app/app.asar
             app/update.json
           tag_name: ${{ steps.ver.outputs.tag }}

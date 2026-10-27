@@ -9,4 +9,8 @@ contextBridge.exposeInMainWorld('vw', {
   copy: t => ipcRenderer.send('vw:copy', String(t || '')),
   clear: () => ipcRenderer.send('vw:clear'),
   onTop: v => ipcRenderer.send('vw:ontop', !!v),
+  onOpt: cb => ipcRenderer.on('vw:opt', (_e, o) => cb(o)),
+  onDocked: cb => ipcRenderer.on('vw:docked', (_e, v) => cb(!!v)),
+  dock: () => ipcRenderer.send('vw:dock'),
+  undock: () => ipcRenderer.send('vw:undock'),
 });

@@ -9,7 +9,7 @@
 
 ## ダウンロード
 
-[最新版をダウンロード(Windows 10 / 11 64bit)](https://github.com/kako774/nico-multiview/releases/download/v1.0.6/NicoMultiView-win-1.0.6.zip)
+[最新版をダウンロード(Windows 10 / 11 64bit)](https://github.com/kako774/nico-multiview/releases/download/v1.1.0/NicoMultiView-win-1.1.0.zip)
 
 過去のバージョンは [Releases](https://github.com/kako774/nico-multiview/releases) にあります。
 

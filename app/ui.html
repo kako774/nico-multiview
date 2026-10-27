@@ -25,20 +25,24 @@
 html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
   font-family:"Noto Sans JP","Yu Gothic UI","Meiryo","Hiragino Sans",sans-serif;font-size:14px}
 body{display:flex;flex-direction:column;overflow:hidden;user-select:none}
-#bar{flex:0 0 auto;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:7px 10px;background:var(--panel);border-bottom:1px solid var(--line)}
+#bar{flex:0 0 auto;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line)}
 #bar h1{font-size:15px;margin:0 6px 0 0;white-space:nowrap}
-#addForm{position:relative;display:flex;gap:6px;flex:1 1 320px;min-width:220px;max-width:560px}
+#addForm{position:relative;display:flex;gap:6px;flex:1 1 200px;min-width:150px;max-width:420px}
 input[type=text]{min-width:0;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--input);color:var(--text);font:inherit;user-select:text}
 input[type=text]:focus{outline:2px solid var(--accent)}
 input[type=text]:disabled{opacity:.55}
 #addInput{flex:1}
 .sgmsg{padding:14px;color:var(--sub);text-align:center;font-size:13px}
-button,select{font:inherit;color:var(--text);background:var(--btn);border:1px solid var(--line);border-radius:8px;padding:7px 11px;cursor:pointer}
+button,select{font:inherit;font-size:13px;color:var(--text);background:var(--btn);border:1px solid var(--line);border-radius:8px;padding:6px 9px;cursor:pointer}
 button:hover:not(:disabled),select:hover{border-color:var(--btnhv)}
 button:disabled{opacity:.5;cursor:default}
 button.primary{background:var(--accent);border-color:var(--accent);color:var(--onaccent);font-weight:700}
 .chk{display:flex;align-items:center;gap:5px;color:var(--sub);cursor:pointer;white-space:nowrap}
 #setBtn{margin-left:auto}
+/* ヘッダーが2行にならないよう、狭いときは順に省略する */
+@media (max-width:1760px){#bar h1{display:none}}
+@media (max-width:1420px){#bar .t{display:none}}
+@media (max-width:1180px){#bar .chk span.lb{display:none}}
 #setPanel{display:none}
 .srow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0}
 .srow+.srow{border-top:1px solid var(--line)}
@@ -75,10 +79,19 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--o
 .tile.g3{border-color:#b0662a;box-shadow:inset 0 0 0 1px #b0662a}
 .row2{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;align-items:center}
 .row2 input[type=text]{flex:1;min-width:180px}
-#msg{font-size:12px;color:var(--sub);width:100%;display:none}
-#msg.show{display:block}#msg.err{color:var(--danger)}
+#msg{font-size:14px;font-weight:700;line-height:1.5;color:var(--text);width:100%;box-sizing:border-box;display:none;padding:8px 12px 8px 36px;border-radius:8px;border:1px solid var(--accent);background:color-mix(in srgb,var(--accent) 16%,var(--panel));position:relative}
+#msg::before{content:'ℹ';position:absolute;left:11px;top:8px;width:18px;height:18px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;line-height:18px;text-align:center}
+#msg.show{display:block}
+#msg.err{border-color:var(--danger);background:color-mix(in srgb,var(--danger) 16%,var(--panel))}
+#msg.err::before{content:'!';background:var(--danger)}
 body.fs #bar,body.clean #bar{display:none}
-#wrap{position:relative;flex:1 1 auto;min-height:0;background:var(--stagebg)}
+#main{flex:1 1 auto;min-height:0;display:flex}
+#wrap{position:relative;flex:1 1 0;min-width:0;min-height:0;background:var(--stagebg)}
+#split{flex:0 0 7px;cursor:col-resize;background:var(--line);display:none}
+#split:hover,#split.drag{background:var(--accent)}
+#dock{flex:0 0 auto;width:420px;display:none;background:var(--panel)}
+body.docked #split,body.docked #dock{display:block}
+body.fs #split,body.fs #dock,body.clean #split,body.clean #dock{display:none}
 #stage{position:absolute;inset:0;display:grid;gap:4px;padding:4px}
 .tile{display:flex;flex-direction:column;min-width:0;min-height:0;border:1px solid var(--line);border-radius:4px;background:var(--tilebg);overflow:hidden}
 .tile.dragover{outline:3px solid var(--accent);outline-offset:-3px}
@@ -131,13 +144,14 @@ body.showCmt .foot{display:flex}
   <label class="chk" title="184(投稿者を表示しない)でコメントします"><input id="use184" type="checkbox">184</label>
   <button id="muteAll" type="button" title="全枠の音声を一括でOFF / ON">全て消音</button>
   <button id="cleanBtn" type="button" title="検索窓・ボタン・音量・コメント欄を隠して、映像の枠だけを表示します(F10)。画面の一番上にカーソルを持っていくと戻るボタンが出ます">枠のみ</button>
-  <button id="fsBtn" type="button" title="全画面(F11)。上のバーを隠して、枠だけを全画面で表示します。Escで戻ります">⛶ 全画面</button>
-  <button id="ppBtn" type="button" title="いま開いている枠を保存/呼び出し">📁 枠の保存</button>
-  <button id="evBtn" type="button" title="ギフトイベントの上位者の放送を自動で並べる">🎁 ギフトイベント</button>
+  <button id="fsBtn" type="button" title="全画面(F11)。上のバーを隠して、枠だけを全画面で表示します。Escで戻ります">⛶<span class="t"> 全画面</span></button>
+  <button id="ppBtn" type="button" title="いま開いている枠を保存/呼び出し">📁<span class="t"> 枠の保存</span></button>
+  <button id="flBtn" type="button" title="フォロー中で、いま放送中の番組を一覧から開く">👥<span class="t"> フォロー中</span></button>
+  <button id="evBtn" type="button" title="ギフトイベントの上位者の放送を自動で並べる">🎁<span class="t"> ギフトイベント</span></button>
   <div id="evChip"><span id="evChipT"></span><button id="evStop" type="button" title="追跡をやめる(枠はそのまま残ります)">✕</button></div>
   <button id="viewerBtn" type="button" title="全枠のコメントをまとめて表示する別窓を開く">コメントビューア</button>
   <button id="clearBtn" type="button">全部閉じる</button>
-  <button id="setBtn" type="button" title="テーマ・プレイヤーのみ・ログイン">⚙ 設定</button>
+  <button id="setBtn" type="button" title="テーマ・プレイヤーのみ・ログイン">⚙<span class="t"> 設定</span></button>
   <div id="msg" role="status"></div>
 </div>
 <div id="setPanel" hidden>
@@ -150,6 +164,7 @@ body.showCmt .foot{display:flex}
   <div class="srow"><span id="authState">未ログイン</span><button id="authBtn" type="button">ニコニコにログイン</button></div>
   <div class="srow ver"><span id="verText">バージョン</span></div>
 </div>
+<div id="main">
 <div id="wrap">
   <div id="stage"></div>
   <div id="empty" class="show">
@@ -159,6 +174,9 @@ body.showCmt .foot{display:flex}
     コメントするには、右上の「ニコニコにログイン」からログインしてください</div>
   </div>
 </div>
+<div id="split" title="ドラッグで幅を変える"></div>
+<div id="dock"></div>
+</div>
 
 <script>
 (() => {
@@ -167,7 +185,7 @@ body.showCmt .foot{display:flex}
   const $ = s => document.querySelector(s);
   const stage = $('#stage'), emptyEl = $('#empty'), msg = $('#msg'), layoutSel = $('#layout');
   let items = [], layout = 'auto', audioIds = [];   // 音声ONの枠(複数可)
-  let playerOnly = true, showCmt = true, use184 = false, loggedIn = false, loginVia = '';
+  let playerOnly = true, showCmt = true, use184 = false, loggedIn = false, loginVia = '', audioOnAdd = true, hideSrcName = false, alwaysTop = false, evAudioAll = false;
   let theme = 'system';
   let hideCmts = {};   // 枠ごとの「流れるコメントを隠す」
   let volumes = {}, lastVol = 0.5;   // 枠ごとの音量(0〜1)と、最後に動かした音量(新しい枠の初期値)
@@ -179,14 +197,14 @@ body.showCmt .foot{display:flex}
   const infos = new Map();   // lv番号 -> { name: 放送者名, title: 番組名 }
 
   const parseIds = t => [...new Set((String(t || '').match(/lv\d+/gi) || []).map(s => s.toLowerCase()))];
-  const persist = () => window.mv.save({ items, layout, audioIds, playerOnly, showCmt, use184, volumes, lastVol, hideCmts, theme, evTrack, evKeys, presets });
+  const persist = () => window.mv.save({ items, layout, audioIds, playerOnly, showCmt, use184, audioOnAdd, evAudioAll, hideSrcName, alwaysTop, volumes, lastVol, hideCmts, theme, evTrack, evKeys, presets });
   // 表示名: 放送者名(取得できるまではlv番号)
   const nameOf = id => (infos.get(id) && infos.get(id).name) || id;
 
   let msgTimer;
   function say(text, err) {
     msg.textContent = text; msg.className = 'show' + (err ? ' err' : '');
-    clearTimeout(msgTimer); msgTimer = setTimeout(() => { msg.className = ''; layoutNow(); }, 4500);
+    clearTimeout(msgTimer); msgTimer = setTimeout(() => { msg.className = ''; layoutNow(); }, err ? 10000 : 7000);
     layoutNow();
   }
 
@@ -289,8 +307,30 @@ body.showCmt .foot{display:flex}
       return { id: t.dataset.id, x: r.left, y: r.top, w: r.width, h: r.height };
     });
     window.mv.sync(rects, audioIds, playerOnly, volumes, hideCmts);
+    sendDock();
     window.mv.giftTargets(items.map(id => ({ id, name: nameOf(id) })));
   }
+  // 合体したコメントビューアを置く場所(右側)を、メインプロセスへ伝える
+  const dockEl = $('#dock'), splitEl = $('#split');
+  let dockOn = false, dockW = 420;
+  function sendDock() {
+    if (!dockOn || getComputedStyle(dockEl).display === 'none') { window.mv.dockRect(null); return; }
+    const r = dockEl.getBoundingClientRect();
+    window.mv.dockRect({ x: r.left, y: r.top, width: r.width, height: r.height });
+  }
+  window.mv.onDock((on, w) => {
+    dockOn = !!on; if (w >= 280) dockW = w;
+    dockEl.style.width = dockW + 'px';
+    document.body.classList.toggle('docked', dockOn);
+    layoutNow(); setTimeout(layoutNow, 120);
+  });
+  splitEl.addEventListener('pointerdown', ev => {
+    ev.preventDefault(); splitEl.setPointerCapture(ev.pointerId); splitEl.classList.add('drag');
+    const startX = ev.clientX, startW = dockW;
+    const mv = e => { dockW = Math.max(280, Math.min(Math.round(window.innerWidth * 0.6), startW + (startX - e.clientX))); dockEl.style.width = dockW + 'px'; layoutNow(); };
+    const up = () => { splitEl.classList.remove('drag'); splitEl.removeEventListener('pointermove', mv); splitEl.removeEventListener('pointerup', up); splitEl.removeEventListener('pointercancel', up); window.mv.dockWidth(dockW); };
+    splitEl.addEventListener('pointermove', mv); splitEl.addEventListener('pointerup', up); splitEl.addEventListener('pointercancel', up);
+  });
   let raf = 0;
   function layoutNow() { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { applyGrid(); sendRects(); }); }
 
@@ -401,8 +441,8 @@ body.showCmt .foot{display:flex}
       items.push(id); added++;
       if (typeof volumes[id] !== 'number') volumes[id] = lastVol;
     }
-    // 1枠だけ追加したときは、音声ONの枠がなければその枠をON。まとめて追加したときは全てミュートで始める
-    if (added === 1 && !audioIds.length) audioIds = [items[items.length - 1]];
+    // 設定「追加したときに音声を出す」がONなら、1枠だけ追加したときその枠の音声をONにする(まとめて追加したときは全てミュートで始める)。OFFなら、いつもミュートで始める
+    if (added === 1 && audioOnAdd) { const nid = items[items.length - 1]; if (!audioIds.includes(nid)) audioIds = [...audioIds, nid]; }
     render();
     const p = [];
     if (added) p.push(`${added}枠を追加しました`);
@@ -502,7 +542,7 @@ body.showCmt .foot{display:flex}
   let appVersion = '', updateInfo = null;
   const checkUpdate = () => window.mv.updateCheck().then(r => {
     updateInfo = r && r.ok && r.newer ? { latest: r.latest, auto: !!r.auto } : null;
-    setBtn.textContent = updateInfo ? '⚙ 設定 🔔' : '⚙ 設定';
+    setBtn.innerHTML = updateInfo ? '⚙<span class="t"> 設定</span> 🔔' : '⚙<span class="t"> 設定</span>';
     setBtn.title = updateInfo ? `新しいバージョン v${updateInfo.latest} があります` : 'テーマ・プレイヤーのみ・ログイン';
     if (menuType === 'set') window.mv.menuData(menuData());
   }).catch(() => {});
@@ -512,7 +552,7 @@ body.showCmt .foot{display:flex}
   const themeSel = $('#theme');
   themeSel.addEventListener('change', () => { theme = themeSel.value; window.mv.setTheme(theme); persist(); });
   $('#viewerBtn').addEventListener('click', () => window.mv.openViewer());
-  $('#clearBtn').addEventListener('click', () => { items = []; audioIds = []; render(); });
+  $('#clearBtn').addEventListener('click', () => { if (!items.length) return; if (!confirm(`開いている ${items.length} 枠をすべて閉じますか?`)) return; items = []; audioIds = []; render(); });
   $('#authBtn').addEventListener('click', () => {
     if (loggedIn) { if (confirm('ニコニコからログアウトしますか?')) window.mv.logout(); }
     else { window.mv.login(); say('入れないときは、設定の「ブラウザでログイン」を使えます'); }
@@ -580,7 +620,7 @@ body.showCmt .foot{display:flex}
   // メニュー(映像と同じネイティブのビューで、いちばん手前に出る)
   function menuData() {
     const names = {}; presets.forEach(p => p.items.forEach(id => { names[id] = nameOf(id); })); items.forEach(id => { names[id] = nameOf(id); });
-    return { theme, playerOnly, loggedIn, loginVia, appVersion, update: updateInfo, presets, names, evKeys, evTrack, evN, dlgCount: items.length, dlgNames: items.map(nameOf) };
+    return { theme, playerOnly, audioOnAdd, evAudioAll, hideSrcName, alwaysTop, loggedIn, loginVia, appVersion, update: updateInfo, presets, names, evKeys, evTrack, evN, items: items.slice(), dlgCount: items.length, dlgNames: items.map(nameOf) };
   }
   function openMenu(type, btn) {
     const r = btn.getBoundingClientRect();
@@ -594,10 +634,14 @@ body.showCmt .foot{display:flex}
     menuType = type;
     window.mv.menuOpen(type, { left: r.left, bottom: r.bottom }, menuData());
   }
-  document.addEventListener('mousedown', e => { if (menuType && menuType !== 'sug' && !e.target.closest('#evBtn, #ppBtn, #setBtn')) window.mv.menuClose(); }, true);
+  document.addEventListener('mousedown', e => { if (menuType && menuType !== 'sug' && !e.target.closest('#evBtn, #flBtn, #ppBtn, #setBtn')) window.mv.menuClose(); }, true);
   window.mv.onMenuClosed(t => { if (menuType === t) menuType = ''; if (t === 'sug') sgOpen = false; });
   window.mv.onMenuAct((action, p) => {
     if (action === 'set-theme') { themeSel.value = String(p); themeSel.dispatchEvent(new Event('change')); window.mv.menuData(menuData()); return; }
+    if (action === 'set-top') { alwaysTop = !!p; window.mv.alwaysTop(alwaysTop); persist(); window.mv.menuData(menuData()); return; }
+    if (action === 'set-hsn') { hideSrcName = !p; window.mv.viewerOpt({ hideSrc: hideSrcName }); persist(); window.mv.menuData(menuData()); return; }
+    if (action === 'set-eaa') { evAudioAll = !!p; persist(); window.mv.menuData(menuData()); return; }
+    if (action === 'set-aoa') { audioOnAdd = !!p; persist(); window.mv.menuData(menuData()); return; }
     if (action === 'set-po') { poEl.checked = !!p; poEl.dispatchEvent(new Event('change')); window.mv.menuData(menuData()); return; }
     if (action === 'set-log') { window.mv.logOpen(); return; }
     if (action === 'set-update') { window.mv.openRelease(); return; }
@@ -608,6 +652,8 @@ body.showCmt .foot{display:flex}
     }
     if (action === 'set-auth') { $('#authBtn').click(); return; }
     if (action === 'set-browser') { say('ブラウザが開きます。ログインすると、自動でこのアプリに反映されます'); window.mv.browserLogin(); return; }
+    if (action === 'fl-add') { add(String(p)); window.mv.menuData(menuData()); return; }
+    if (action === 'fl-all') { add((Array.isArray(p) ? p : []).join(' ')); window.mv.menuData(menuData()); return; }
     if (action === 'sug-hover') { sgIdx = Number(p); return; }
     if (action === 'sug-pick') { pickSug(Number(p)); addInput.focus(); return; }
     if (action === 'pp-save') {
@@ -645,8 +691,9 @@ body.showCmt .foot{display:flex}
     }
     doTrack(e);
   }
+  let evAudioPending = false;   // 追跡を始めたあと、最初に枠が並んだときだけ、音声を出す
   function doTrack(e) {
-    evGen++; evBusy = false;
+    evGen++; evBusy = false; evAudioPending = true;
     items = []; audioIds = []; evLvs = []; ranks.clear(); focusId = '';
     layout = 'auto';   // ギフト表示は自動グリッド
     evTrack = { key: e.key, title: e.title, n: Number(evN) || 4 };
@@ -676,13 +723,18 @@ body.showCmt .foot{display:flex}
       const next = [...want, ...manual].slice(0, MAX);
       next.forEach(id => { if (typeof volumes[id] !== 'number') volumes[id] = lastVol; });
       evLvs.filter(id => !want.includes(id)).forEach(id => { audioIds = audioIds.filter(x => x !== id); });
+      // 設定「ギフトイベントで全枠の音声を出す」: 追跡で並んだ(新しく増えた)枠の音声をすべてONにする
+      if (evAudioAll) { const fresh = want.filter(id => !evLvs.includes(id) && next.includes(id) && !audioIds.includes(id)); if (fresh.length) audioIds = [...audioIds, ...fresh]; }
       evLvs = want; items = next;
+      // 設定「追加したときに音声を出す」がONなら、追跡で最初に並んだとき、1位の枠の音声をONにする
+      if (evAudioPending && want.length) { evAudioPending = false; if (audioOnAdd && !audioIds.length && !evAudioAll) audioIds = [want[0]]; }
       render();
     } else updateTags();
     const off = r.top.filter(x => !x.lv).map(x => `${x.rank}位 ${x.name}`);
     if (first && off.length) say((live.length ? '' : '上位者で放送中の人がいません / ') + `放送なし: ${off.join('、')}`, !live.length);
   }
   evBtn.addEventListener('click', () => openMenu('ev', evBtn));
+  $('#flBtn').addEventListener('click', () => openMenu('fl', $('#flBtn')));
   $('#ppBtn').addEventListener('click', () => openMenu('pp', $('#ppBtn')));
   $('#evStop').addEventListener('click', stopTrack);
 
@@ -698,6 +750,11 @@ body.showCmt .foot{display:flex}
       if (typeof s.playerOnly === 'boolean') playerOnly = s.playerOnly;
       if (typeof s.showCmt === 'boolean') showCmt = s.showCmt;
       if (typeof s.use184 === 'boolean') use184 = s.use184;
+      if (typeof s.audioOnAdd === 'boolean') audioOnAdd = s.audioOnAdd;
+      if (typeof s.evAudioAll === 'boolean') evAudioAll = s.evAudioAll;
+      if (typeof s.hideSrcName === 'boolean') hideSrcName = s.hideSrcName;
+      window.mv.viewerOpt({ hideSrc: hideSrcName });
+      if (typeof s.alwaysTop === 'boolean') { alwaysTop = s.alwaysTop; window.mv.alwaysTop(alwaysTop); }
       if (['system', 'light', 'dark'].includes(s.theme)) theme = s.theme;
       if (s.volumes && typeof s.volumes === 'object') for (const [k, v] of Object.entries(s.volumes)) if (/^lv\d+$/.test(k) && Number.isFinite(Number(v))) volumes[k] = Math.min(1, Math.max(0, Number(v)));
       if (s.hideCmts && typeof s.hideCmts === 'object') for (const [k, v] of Object.entries(s.hideCmts)) if (/^lv\d+$/.test(k) && v === true) hideCmts[k] = true;

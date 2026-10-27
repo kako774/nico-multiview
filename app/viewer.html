@@ -61,6 +61,11 @@ input[type=text]:focus{outline:2px solid var(--accent)}
   .no{text-align:left}
 }
 @media (max-width:420px){ .no{display:none} .line{grid-template-columns:auto 10px minmax(0,1fr) minmax(0,9em)} }
+/* 設定「コメントビューアに放送者名を表示」をOFFにしたとき */
+body.nosrc .s{display:none}
+body.nosrc .line{grid-template-columns:3.6em 4.4em 10px 9.5em 1fr}
+@media (max-width:680px){ body.nosrc .line{grid-template-columns:auto auto 10px minmax(0,1fr)} }
+@media (max-width:420px){ body.nosrc .line{grid-template-columns:auto 10px minmax(0,1fr)} }
 #list{overflow-x:hidden}
 #empty{color:var(--sub);text-align:center;padding:36px 16px;line-height:1.9}
 .menu{position:fixed;z-index:50;min-width:15em;max-width:88vw;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 28px #0006;padding:6px;display:grid;gap:4px}
@@ -88,7 +93,8 @@ input[type=text]:focus{outline:2px solid var(--accent)}
   <button id="fm" type="button" title="文字を小さく">A−</button>
   <button id="fp" type="button" title="文字を大きく">A＋</button>
   <span id="mode" class="chk" title="コメントを受け取っています"></span>
-  <label class="chk"><input id="top" type="checkbox">最前面</label>
+  <label class="chk" id="topLab"><input id="top" type="checkbox">最前面</label>
+  <button id="dockBtn" type="button" title="メインの窓の右側に合体します">合体</button>
   <button id="ngb" type="button" title="NGユーザー・NGワードの確認と解除">NG</button>
   <button id="clr" type="button">クリア</button>
 </div>
@@ -104,18 +110,26 @@ input[type=text]:focus{outline:2px solid var(--accent)}
   const list = $('#list'), chips = $('#chips'), latest = $('#latest');
   const MAXLINES = 1500;
   const colorOf = new Map(), names = new Map(), hidden = new Set();
+  let openIds = null;   // いま開いている枠(メインから届く)
   let query = '';
 
   const color = id => { if (!colorOf.has(id)) colorOf.set(id, `var(--c${colorOf.size % 8})`); return colorOf.get(id); };
   const nameOf = id => names.get(id) || id;
   const hhmmss = t => { const d = new Date(t), p = n => String(n).padStart(2, '0'); return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; };
   const atBottom = () => list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+  // 自動スクロール: 上へスクロールするか、コメントをクリックすると完全に止まる。 「最新へ」を押すか、手で一番下まで戻すと再開する
+  let paused = false, userAt = 0;
+  const follow = () => !paused && atBottom();
+  const showLatest = () => { latest.style.display = (paused || !atBottom()) ? 'block' : 'none'; };
+  const pause = () => { paused = true; showLatest(); };
+  const resume = () => { paused = false; list.scrollTop = list.scrollHeight; showLatest(); };
   const matches = (el) => !hidden.has(el.dataset.src) && (!query || el.dataset.text.includes(query));
   const applyFilter = el => el.classList.toggle('hide', !matches(el));
 
   function renderChips() {
     chips.textContent = '';
     for (const [id] of colorOf) {
+      if (openIds && !openIds.has(id)) continue;   // 閉じた枠は、絞り込みの一覧に出さない(過去のコメントは残る)
       const c = document.createElement('div'); c.className = 'chip' + (hidden.has(id) ? ' off' : ''); c.title = id + '(クリックで表示/非表示)';
       const dot = document.createElement('i'); dot.style.background = color(id);
       const nm = document.createElement('span'); nm.textContent = nameOf(id);
@@ -125,7 +139,7 @@ input[type=text]:focus{outline:2px solid var(--accent)}
     }
   }
   function refilter() {
-    const stick = atBottom();
+    const stick = follow();
     list.querySelectorAll('.line').forEach(applyFilter);
     if (stick) list.scrollTop = list.scrollHeight;
   }
@@ -167,7 +181,7 @@ input[type=text]:focus{outline:2px solid var(--accent)}
   }
   function add(items) {
     if (!items.length) return;
-    const stick = atBottom();
+    const stick = follow();
     const e = $('#empty'); if (e) e.remove();
     const frag = document.createDocumentFragment();
     let newSrc = false;
@@ -182,7 +196,7 @@ input[type=text]:focus{outline:2px solid var(--accent)}
     list.appendChild(frag);
     while (list.childElementCount > MAXLINES) list.firstElementChild.remove();
     if (newSrc) renderChips();
-    if (stick) list.scrollTop = list.scrollHeight; else latest.style.display = 'block';
+    if (stick) list.scrollTop = list.scrollHeight; else showLatest();
   }
   const rows = () => list.querySelectorAll('.line');
   function restyle() { rows().forEach(l => { const it = l._it; l.classList.toggle('ng', isNg(it)); l.classList.toggle('sel', !!selU && it.u === selU); const c = ucol[it.u]; l.querySelector('.d').style.background = userColor(it.u); l.querySelector('.n').style.color = c || ''; if (c) l.style.setProperty('--tint', tintOf(c)); else l.style.removeProperty('--tint'); }); }
@@ -268,10 +282,15 @@ input[type=text]:focus{outline:2px solid var(--accent)}
   });
   document.addEventListener('click', closeMenu);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeMenu(); if (selU) { selU = ''; restyle(); } } });
-  list.addEventListener('scroll', closeMenu);
-
-  list.addEventListener('scroll', () => { latest.style.display = atBottom() ? 'none' : 'block'; });
-  latest.addEventListener('click', () => { list.scrollTop = list.scrollHeight; });
+  // メニューは、自分でスクロールしたときだけ閉じる(新しいコメントによる自動スクロールでは閉じない)
+  list.addEventListener('wheel', e => { userAt = Date.now(); closeMenu(); if (e.deltaY < 0) pause(); }, { passive: true });
+  list.addEventListener('pointerdown', () => { userAt = Date.now(); pause(); });
+  list.addEventListener('keydown', () => { userAt = Date.now(); });
+  list.addEventListener('scroll', () => {
+    if (paused && Date.now() - userAt < 800 && atBottom()) paused = false;   // 手で一番下まで戻したら再開
+    showLatest();
+  });
+  latest.addEventListener('click', resume);
   $('#q').addEventListener('input', e => { query = e.target.value.trim().toLowerCase(); refilter(); });
   $('#clr').addEventListener('click', () => { list.textContent = ''; store.length = 0; seenKey.clear(); window.vw.clear(); });
   $('#top').addEventListener('change', e => window.vw.onTop(e.target.checked));
@@ -284,7 +303,9 @@ input[type=text]:focus{outline:2px solid var(--accent)}
 
   window.vw.onSources(src => {
     (src || []).forEach(s => { names.set(s.id, s.name); color(s.id); });
-    renderChips(); refreshNames();
+    openIds = new Set((src || []).map(s => s.id));
+    let changed = false; for (const id of [...hidden]) if (!openIds.has(id)) { hidden.delete(id); changed = true; }
+    renderChips(); refreshNames(); if (changed) refilter();
   });
   const showMode = m => {
     const vals = Object.values(m || {}), el = $('#mode');
@@ -294,13 +315,24 @@ input[type=text]:focus{outline:2px solid var(--accent)}
     el.append(lamp, document.createTextNode('接続中'));
   };
   window.vw.onMode(showMode);
+  window.vw.onOpt(o => document.body.classList.toggle('nosrc', !!(o && o.hideSrc)));
   window.vw.onComments(items => add(items));
-  window.vw.init().then(({ backlog, sources, modes }) => {
+  window.vw.init().then(({ backlog, sources, modes, opt }) => {
     showMode(modes);
+    document.body.classList.toggle('nosrc', !!(opt && opt.hideSrc));
     (sources || []).forEach(s => { names.set(s.id, s.name); color(s.id); });
-    renderChips(); add(backlog || []); list.scrollTop = list.scrollHeight;
+    openIds = new Set((sources || []).map(s => s.id));
+    renderChips(); add(backlog || []); list.scrollTop = list.scrollHeight; showLatest();
   });
 })();
+  // 合体(メインの窓の右側に入る)/ 切り離し
+  (() => {
+    const b = document.getElementById('dockBtn'), lab = document.getElementById('topLab');
+    let docked = false;
+    const apply = d => { docked = d; b.textContent = d ? '切り離す' : '合体'; b.title = d ? '別の窓に切り離します' : 'メインの窓の右側に合体します'; lab.style.display = d ? 'none' : ''; };
+    b.addEventListener('click', () => { if (docked) window.vw.undock(); else window.vw.dock(); });
+    window.vw.onDocked(apply); apply(false);
+  })();
 </script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 {
   "name": "nico-multiview",
   "productName": "ニコ生マルチビュー",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "ニコニコ生放送を複数枠まとめて同時視聴するデスクトップアプリ",
   "main": "main.js",
   "private": true,
@@ -16,6 +16,9 @@
       "main.js",
       "preload.js",
       "view-preload.js",
+      "live-direct.js",
+      "log.html",
+      "log-preload.js",
       "viewer-preload.js",
       "ui.html",
       "viewer.html",
@@ -38,6 +41,12 @@
       ],
       "signAndEditExecutable": false,
       "icon": "icon.ico"
+    },
+    "mac": {
+      "icon": "icon.png",
+      "category": "public.app-category.video",
+      "identity": null,
+      "target": [{ "target": "dir" }]
     },
     "electronLanguages": ["ja", "en-US"],
     "artifactName": "NicoMultiView.exe",

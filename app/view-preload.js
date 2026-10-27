@@ -1,7 +1,26 @@
 'use strict';
 // 各枠(ニコ生ページ)の中で動く小さなスクリプト。
 // 「プレイヤーのみ」表示のとき、映像の上でマウスをドラッグすると、枠の並べ替えを始める。
-const { ipcRenderer } = require('electron');
+const { ipcRenderer, webFrame } = require('electron');
+
+// コメント投稿の「184(なふだ)」を、アプリの指定どおりにする。
+// ページがニコ生へ送る投稿メッセージ(postComment)の isAnonymous を、アプリ側の指定(window.__nmvAnon)で上書きする。
+// 設定画面のスイッチを操作する方式は、画面の作りに依存して壊れやすいので使わない。
+try {
+  webFrame.executeJavaScript(`(() => {
+    if (window.__nmvWsPatched || !window.WebSocket) return; window.__nmvWsPatched = true;
+    const send = WebSocket.prototype.send;
+    WebSocket.prototype.send = function (d) {
+      try {
+        if (typeof d === 'string' && typeof window.__nmvAnon === 'boolean' && d.indexOf('postComment') > -1) {
+          const j = JSON.parse(d);
+          if (j && j.type === 'postComment' && j.data && typeof j.data === 'object') { j.data.isAnonymous = window.__nmvAnon; d = JSON.stringify(j); }
+        }
+      } catch (e) { /* 変えられなければ、そのまま送る */ }
+      return send.call(this, d);
+    };
+  })()`).catch(() => {});
+} catch { /* 無視 */ }
 
 let down = null, dragging = false, suppressClick = false;
 const skip = t => !!(t && t.closest && t.closest('button, a, input, textarea, select, [role="slider"], [class*="seek"], [class*="control"]'));

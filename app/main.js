@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, WebContentsView, ipcMain, shell, session, screen, nativeTheme, net } = require('electron');
+const { app, BrowserWindow, WebContentsView, ipcMain, shell, session, screen, nativeTheme, net, dialog, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -26,9 +26,26 @@ const escRe = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const fixUA = ua => ua
   .replace(new RegExp('\\s' + escRe(app.name) + '\\/\\S+', 'g'), '')
   .replace(/\s(Electron|nico-multiview)\/\S+/g, '');
+const ORIG_UA = app.userAgentFallback;   // 手を加えない本来の名前(ログイン窓で使う)
 app.userAgentFallback = fixUA(app.userAgentFallback);
 // 終了中に、すでに閉じた窓・ビューへ触れて出る「Object has been destroyed」は、害がないので無視する(それ以外のエラーは、これまでどおり表示)
-process.on('uncaughtException', err => { if (/Object has been destroyed/.test(String(err && err.message))) return; throw err; });
+process.on('uncaughtException', err => { if (/Object has been destroyed/.test(String(err && err.message))) return; appLog('エラー: ' + String(err && err.message || err), 'ERROR'); throw err; });
+
+/* ------------------------------------------------------------------ *
+ * 動作ログ(設定の「ログ」から見られる)
+ *  接続の開始・切り替え・終了、投稿の成否、更新、ログインなどの出来事を残す。
+ *  URL は残さない(放送ID、枠の番号などは残す)。 メモリ上だけに持ち、アプリを閉じると消える。
+ * ------------------------------------------------------------------ */
+const LOG_MAX = 500;
+const logBuf = [];
+let logWin = null;
+const logClean = t => String(t == null ? '' : t).replace(/(?:https?|wss?):\/\/\S+/gi, '(URL)').replace(/\s+/g, ' ').slice(0, 300);
+function appLog(msg, level) {
+  const e = { t: Date.now(), l: level === 'ERROR' || level === 'WARN' ? level : 'INFO', m: logClean(msg) };
+  logBuf.push(e);
+  if (logBuf.length > LOG_MAX) logBuf.splice(0, logBuf.length - LOG_MAX);
+  if (logWin && !logWin.isDestroyed()) logWin.webContents.send('lg:line', e);
+}
 const ses = () => session.fromPartition(PARTITION);
 
 /* ------------------------------------------------------------------ *
@@ -96,6 +113,35 @@ const REL_PAGE = 'https://github.com/kako774/nico-multiview/releases';
 const DL_PAGE = 'https://nico-ran.stream/tools/nico-multiview/';
 const verNum = s => String(s || '').replace(/^v/i, '').split('.').map(x => parseInt(x, 10) || 0);
 const isNewer = (a, b) => { const x = verNum(a), y = verNum(b); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); } return false; };
+// 更新のしくみ: 新しいバージョンがあれば知らせる。 アプリ本体(app.asar。数百KB)だけの更新で済むときは、
+// アプリの中でダウンロードして入れ替え、再起動する(Windowsのみ)。 実行環境(Electron)が変わるときは、配布ページから新しいZIPを入れ直してもらう。
+const UPD_BASE = 'https://github.com/kako774/nico-multiview/releases/latest/download/';
+let updManifest = null;
+async function fetchManifest() {
+  const res = await net.fetch(UPD_BASE + 'update.json', { signal: AbortSignal.timeout(8000) });
+  if (!res.ok) return null;
+  const j = JSON.parse((await res.text()).replace(/^﻿/, ''));
+  if (!j || typeof j.version !== 'string' || !/^[0-9a-f]{64}$/.test(j.sha256 || '') || !(j.size > 0 && j.size < 20 * 1024 * 1024)) return null;
+  if (!verifyManifest(j)) return null;   // 署名が合わないものは、更新として扱わない
+  return j;
+}
+// 更新の案内(update.json)の電子署名を確かめる。 配布元が乗っ取られても、秘密鍵がなければ偽の更新は通らない
+const UPDATE_PUBKEY = 'MCowBQYDK2VwAyEAD0vhtUaKrXBr/62h0ghdS9VLPMa5qV/EXbUJERf0tpQ=';
+function verifyManifest(j) {
+  try {
+    const c = require('crypto');
+    if (typeof j.sig !== 'string' || !j.sig) return false;
+    const key = c.createPublicKey({ key: Buffer.from(UPDATE_PUBKEY, 'base64'), format: 'der', type: 'spki' });
+    const msg = ['nmv-update', j.version, j.sha256, j.size, j.electron].join('\n');
+    return c.verify(null, Buffer.from(msg), key, Buffer.from(j.sig, 'base64'));
+  } catch { return false; }
+}
+function canSelfUpdate(j) {
+  if (process.platform !== 'win32' || !app.isPackaged || !j) return false;
+  if (j.electron !== process.versions.electron) return false;   // 実行環境が変わる更新は、ZIPの入れ直し
+  try { require('fs').accessSync(process.resourcesPath, require('fs').constants.W_OK); } catch { return false; }
+  return true;
+}
 ipcMain.handle('mv:update-check', async () => {
   try {
     const res = await net.fetch('https://api.github.com/repos/kako774/nico-multiview/releases/latest', { headers: { Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(8000) });
@@ -103,10 +149,133 @@ ipcMain.handle('mv:update-check', async () => {
     const j = await res.json();
     const tag = String(j && j.tag_name || '');
     if (!/^v?\d+(\.\d+){1,2}$/.test(tag)) return { ok: false };
-    return { ok: true, latest: tag.replace(/^v/i, ''), newer: isNewer(tag, app.getVersion()) };
+    const newer = isNewer(tag, app.getVersion());
+    let auto = false;
+    if (newer) { try { updManifest = await fetchManifest(); auto = !!updManifest && updManifest.version === tag.replace(/^v/i, '') && canSelfUpdate(updManifest); } catch { updManifest = null; } }
+    if (newer) promptUpdate(tag.replace(/^v/i, ''), auto);
+    return { ok: true, latest: tag.replace(/^v/i, ''), newer, auto };
   } catch { return { ok: false }; }
 });
+let updating = false, updPrepared = null;
+// 新しい app.asar をダウンロードして、照合する(まだ入れ替えない)
+async function prepareUpdate(man) {
+  const fs = require('fs'), crypto = require('crypto');
+  const res = await net.fetch(`https://github.com/kako774/nico-multiview/releases/download/v${man.version}/app.asar`, { signal: AbortSignal.timeout(60000) });
+  if (!res.ok) throw new Error('ダウンロードできませんでした(' + res.status + ')');
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.length !== man.size) throw new Error('ファイルの大きさが合いません');
+  if (crypto.createHash('sha256').update(buf).digest('hex') !== man.sha256) throw new Error('ファイルが壊れています(照合に失敗)');
+  const dir = path.join(app.getPath('userData'), 'update');
+  fs.mkdirSync(dir, { recursive: true });
+  const next = path.join(dir, 'app.asar.new');
+  fs.writeFileSync(next, buf);
+  return next;
+}
+// このアプリが終わるのを待って入れ替え(元のファイルは .bak に残す)、再起動する
+function finishUpdate(next) {
+  const target = path.join(process.resourcesPath, 'app.asar');
+  const q = s => "'" + String(s).replace(/'/g, "''") + "'";
+  const ps = [
+    `$ErrorActionPreference='SilentlyContinue'`,
+    `Wait-Process -Id ${process.pid} -Timeout 30`,
+    `for($i=0;$i -lt 20;$i++){ try { Copy-Item -LiteralPath ${q(target)} -Destination ${q(target + '.bak')} -Force -ErrorAction Stop; Move-Item -LiteralPath ${q(next)} -Destination ${q(target)} -Force -ErrorAction Stop; break } catch { Start-Sleep -Milliseconds 500 } }`,
+    `Start-Process -FilePath ${q(process.execPath)}`,
+  ].join('; ');
+  const enc = Buffer.from(ps, 'utf16le').toString('base64');
+  const child = require('child_process').spawn('powershell.exe', ['-NoProfile', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', enc], { detached: true, stdio: 'ignore', windowsHide: true });
+  child.on('error', () => {});
+  child.unref();
+  setTimeout(() => app.quit(), 300);
+}
+const msgBox = opts => (win && !win.isDestroyed() ? dialog.showMessageBox(win, opts) : dialog.showMessageBox(opts));
+// 更新の流れ: (確認) → ダウンロードと照合 → 「再起動します」でOK → 入れ替えて再起動
+async function runUpdate(man, ask) {
+  if (updating) return { ok: false, error: '更新中です' };
+  if (!man || !canSelfUpdate(man)) return { ok: false, error: 'この版は、アプリの中では更新できません。配布ページから入れ直してください' };
+  if (ask) {
+    const r = await msgBox({ type: 'question', title: 'ニコ生マルチビュー', message: `更新があります(v${man.version})。更新しますか?`, detail: '「更新する」を押すと、更新ファイルをダウンロードします(数百KBです)。', buttons: ['更新する', 'あとで'], defaultId: 0, cancelId: 1, noLink: true });
+    if (r.response !== 0) return { ok: false, cancelled: true };
+  }
+  updating = true;
+  try {
+    appLog(`更新 v${man.version}: ダウンロード開始`);
+    const next = await prepareUpdate(man);
+    appLog(`更新 v${man.version}: 照合に成功。再起動して入れ替えます`);
+    await msgBox({ type: 'info', title: 'ニコ生マルチビュー', message: '更新の準備ができました。', detail: 'OKを押すと、アプリを再起動します。', buttons: ['OK'], defaultId: 0, noLink: true });
+    finishUpdate(next);
+    return { ok: true };
+  } catch (e) {
+    updating = false;
+    const error = String(e && e.message || e).slice(0, 100);
+    appLog('更新に失敗: ' + error, 'ERROR');
+    await msgBox({ type: 'error', title: 'ニコ生マルチビュー', message: '更新できませんでした。', detail: error + '\n\n配布ページから、新しいZIPを入れ直してください。', buttons: ['OK'], noLink: true }).catch(() => {});
+    return { ok: false, error };
+  }
+}
+ipcMain.handle('mv:update-apply', () => runUpdate(updManifest, false));
+// 新しい版が見つかったら、起動中に1回だけ、確認の窓を出す(同じ版では、アプリを起動し直すまで出さない)
+let promptedVer = '';
+async function promptUpdate(latest, auto) {
+  if (promptedVer === latest || updating) return;
+  promptedVer = latest;
+  if (auto) { runUpdate(updManifest, true); return; }
+  const r = await msgBox({ type: 'info', title: 'ニコ生マルチビュー', message: `新しいバージョン(v${latest})があります。`, detail: '配布ページから、新しいZIPをダウンロードしてください。', buttons: ['配布ページを開く', 'あとで'], defaultId: 0, cancelId: 1, noLink: true });
+  if (r.response === 0) shell.openExternal(DL_PAGE);
+}
 ipcMain.on('mv:open-release', () => shell.openExternal(DL_PAGE));
+
+/* ------------------------------------------------------------------ *
+ * 利用できない古い版の停止(policy.json)
+ *  配布側が「この版より古いものは使えない」と決めたとき、起動時と6時間おきに確かめて、案内を出して止める。
+ *  policy.json は更新ファイルと同じ鍵で署名されていて、署名が合わないものは無視する。
+ *  取得できないとき(オフライン、障害など)は、前回取得できたものを使う。 なければ、そのまま使える。
+ * ------------------------------------------------------------------ */
+const POLICY_URL = 'https://github.com/kako774/nico-multiview/releases/download/policy/policy.json';
+function verifyPolicy(j) {
+  try {
+    const c = require('crypto');
+    if (!j || typeof j.minVersion !== 'string' || !/^\d+(\.\d+){1,2}$/.test(j.minVersion) || typeof j.sig !== 'string') return false;
+    const key = c.createPublicKey({ key: Buffer.from(UPDATE_PUBKEY, 'base64'), format: 'der', type: 'spki' });
+    const msg = ['nmv-policy', j.minVersion, j.message || '', j.issued].join('\n');
+    return c.verify(null, Buffer.from(msg), key, Buffer.from(j.sig, 'base64'));
+  } catch { return false; }
+}
+function loadPolicy() {
+  const fs = require('fs'), f = path.join(app.getPath('userData'), 'policy.json');
+  let cached = null;
+  try { const j = JSON.parse(fs.readFileSync(f, 'utf8')); if (verifyPolicy(j)) cached = j; } catch { /* なし */ }
+  return { cached, f };
+}
+let policyShown = false;
+async function checkPolicy() {
+  if (policyShown) return;
+  const fs = require('fs');
+  const { cached, f } = loadPolicy();
+  let best = cached;
+  try {
+    const res = await net.fetch(POLICY_URL, { signal: AbortSignal.timeout(8000) });
+    if (res.ok) {
+      const j = JSON.parse((await res.text()).replace(/^﻿/, ''));
+      // 古い方針に巻き戻されないよう、発行時刻が新しいものだけ採用する
+      if (verifyPolicy(j) && (!best || Number(j.issued) >= Number(best.issued))) { best = j; try { fs.writeFileSync(f, JSON.stringify(j)); } catch { /* 無視 */ } }
+    }
+  } catch { /* 取得できなくても、前回のものを使う */ }
+  if (!best || !isNewer(best.minVersion, app.getVersion())) return;
+  policyShown = true;
+  appLog(`この版(v${app.getVersion()})は利用できません(v${best.minVersion} 以上が必要)`, 'WARN');
+  const extra = String(best.message || '').slice(0, 300);
+  const r = await dialog.showMessageBox({ type: 'warning', title: 'ニコ生マルチビュー', message: 'このバージョンは、利用できなくなりました。', detail: `v${best.minVersion} 以上への更新が必要です(いまは v${app.getVersion()})。` + (extra ? '\n\n' + extra : ''), buttons: ['更新する', '終了'], defaultId: 0, cancelId: 1, noLink: true });
+  if (r.response === 0) {
+    let man = null;
+    try { man = await fetchManifest(); } catch { /* 無視 */ }
+    if (man && canSelfUpdate(man) && !isNewer(best.minVersion, man.version)) {
+      updManifest = man;
+      const u = await runUpdate(man, false);
+      if (u && u.ok) return;   // 入れ替えて再起動する
+    } else shell.openExternal(DL_PAGE);
+  }
+  app.quit();
+}
 ipcMain.handle('mv:version', () => app.getVersion());
 const hideCmt = {};              // lv番号 -> true なら、映像の上を流れるコメントを隠す
 const applyHide = (id, wc) => {
@@ -385,27 +554,47 @@ const viaFile = () => path.join(app.getPath('userData'), 'login-via.txt');
 let loginVia = '';
 try { loginVia = require('fs').readFileSync(viaFile(), 'utf8').trim(); } catch { /* なし */ }
 function setVia(s) { loginVia = s || ''; try { require('fs').writeFileSync(viaFile(), loginVia); } catch { /* 無視 */ } }
+let lastAuthLog = null;
 async function notifyAuth() {
   const v = await isLoggedIn().catch(() => false);
+  if (lastAuthLog !== v) { lastAuthLog = v; appLog(v ? 'ログイン状態: ログイン中' + (loginVia ? `(${loginVia})` : '') : 'ログイン状態: 未ログイン'); }
   if (win && !win.isDestroyed()) win.webContents.send('mv:auth', v, v ? loginVia : '');
   return v;
 }
+let uaHookSet = false;
+function setupLoginUA() {
+  if (uaHookSet) return; uaHookSet = true;
+  // Googleのログインページへの通信だけ、本来の名前を送る(同じ窓の中で Google へ移動する場合のため)
+  ses().webRequest.onBeforeSendHeaders({ urls: ['https://accounts.google.com/*', 'https://accounts.google.co.jp/*'] }, (details, cb) => {
+    const h = Object.assign({}, details.requestHeaders); h['User-Agent'] = ORIG_UA; cb({ requestHeaders: h });
+  });
+}
 function openLogin() {
+  setupLoginUA();
   if (loginWin && !loginWin.isDestroyed()) { loginWin.focus(); return; }
+  appLog('ログイン窓を開きました');
   loginWin = new BrowserWindow({
     width: 520, height: 780, parent: win || undefined,
     title: 'ニコニコにログイン', autoHideMenuBar: true, backgroundColor: '#ffffff',
     webPreferences: { partition: PARTITION, contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
   const wc = loginWin.webContents;
-  wc.setUserAgent(fixUA(wc.getUserAgent()));
+  // ログインの途中で開く別の窓(Googleなど)は、外のブラウザではなく、この窓の子として開き、同じログイン状態を共有する
+  // (参考にしたアプリ nico-live-recorder と同じ動き)。
+  // ニコニコのページ(Cloudflare の確認 Turnstile を含む)には、名前に細工をした状態(「Electron」を含まない)で入る。
+  // Googleのログインページには、本来の名前で入る(下の onBeforeSendHeaders と、別の窓)。
+  wc.setUserAgent(fixUA(ORIG_UA));
+  const childPrefs = { partition: PARTITION, contextIsolation: true, nodeIntegration: false, sandbox: true };
   wc.setWindowOpenHandler(({ url }) => {
-    if (NICO_HOST_RE.test(url)) wc.loadURL(url);
-    else if (/^https:\/\//.test(url)) shell.openExternal(url);
-    return { action: 'deny' };
+    if (!/^https:\/\//.test(url)) return { action: 'deny' };
+    appLog('ログイン窓: 別の窓を開きました');
+    return { action: 'allow', overrideBrowserWindowOptions: { parent: loginWin, width: 500, height: 680, autoHideMenuBar: true, backgroundColor: '#ffffff', webPreferences: childPrefs } };
   });
+  // 別の窓(Googleなどのログイン)は、本来の名前にする(設定を変えるとその窓は読み込み直される)
+  wc.on('did-create-window', child => { try { child.webContents.setUserAgent(ORIG_UA); } catch { /* 無視 */ } });
   loginWin.on('closed', () => { loginWin = null; });
-  wc.loadURL(LOGIN_URL);
+  wc.on('did-fail-load', (_e, code, desc, _u, main) => { if (main) appLog(`ログイン窓: 読み込み失敗 ${code} ${desc}`, 'ERROR'); });
+  wc.loadURL(LOGIN_URL).catch(e => appLog('ログイン窓: loadURL ' + (e && e.message || e), 'ERROR'));
 }
 
 // 普段のブラウザ(Chrome / Edge)でログインして、そのログイン状態をこのアプリに取り込む。
@@ -475,7 +664,9 @@ async function browserLogin() {
   return { ok: false, error: 'ログインを確認できませんでした' };
 }
 ipcMain.on('mv:browser-login', async () => {
+  appLog('ブラウザでのログインを開始');
   const r = await browserLogin();
+  appLog('ブラウザでのログイン: ' + (r && r.ok ? '完了' : '完了せず'), r && r.ok ? 'INFO' : 'WARN');
   if (win && !win.isDestroyed()) win.webContents.send('mv:browser-login-result', r);
 });
 async function logout() {
@@ -493,6 +684,7 @@ async function logout() {
 function commentScript(text, use184) {
   return `(async () => {
     const T = ${JSON.stringify(text)}, ANON = ${use184 ? 'true' : 'false'};
+    window.__nmvAnon = ANON;   // 投稿メッセージの isAnonymous に使う(view-preload.js)
     const form = document.querySelector('form[class*="___comment-post-form___"]');
     if (!form) return { ok: false, error: 'コメント欄が見つかりません(放送が終了している、読み込み中など)' };
     const box = form.querySelector('input[class*="___comment-text-box___"]');
@@ -502,12 +694,19 @@ function commentScript(text, use184) {
     if (box.disabled || (msg && getComputedStyle(msg).display !== 'none')) {
       return { ok: false, error: 'この枠ではコメントできません(未ログイン、投稿不可の枠など)' };
     }
+    // 184かどうかは、view-preload.js が投稿メッセージで指定する
     const setVal = (el, v) => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, v);
       el.dispatchEvent(new Event('input', { bubbles: true }));
     };
     const cmd = form.querySelector('input[class*="___command-text-box___"]');
-    if (cmd && ANON && !/184/.test(cmd.value)) { setVal(cmd, '184'); }
+    if (cmd) {
+      // 184のON/OFFをアプリの指定に合わせる(ページ側に残っていた184も外す)
+      const parts = cmd.value.split(/\\s+/).filter(x => x && x !== '184');
+      if (ANON) parts.push('184');
+      const nv = parts.join(' ');
+      if (nv !== cmd.value) setVal(cmd, nv);
+    }
     setVal(box, T);
     await new Promise(r => setTimeout(r, 80));
     if (btn.disabled) { setVal(box, ''); return { ok: false, error: '送信できません(文字数オーバーなど)' }; }
@@ -527,8 +726,12 @@ ipcMain.handle('mv:comment', async (_e, id, text, use184) => {
   const t = String(text || '').trim();
   if (!t) return { ok: false, error: '空のコメントは送れません' };
   if (!(await isLoggedIn())) return { ok: false, error: '先にログインしてください' };
-  try { return await v.webContents.executeJavaScript(commentScript(t, !!use184)); }
-  catch { return { ok: false, error: 'コメントの送信に失敗しました' }; }
+  try {
+    let r = await v.webContents.executeJavaScript(commentScript(t, !!use184));
+    appLog(`${id}: コメント投稿 ${r && r.ok ? '成功' + (use184 ? '(184)' : '') : '失敗: ' + ((r && r.error) || '不明')}`, r && r.ok ? 'INFO' : 'ERROR');
+    return r;
+  }
+  catch { appLog(`${id}: コメント投稿 失敗(送信エラー)`, 'ERROR'); return { ok: false, error: 'コメントの送信に失敗しました' }; }
 });
 
 
@@ -619,6 +822,21 @@ function openViewer() {
   viewerWin.on('close', saveViewerBounds);   // 閉じる直前の大きさを保存
   viewerWin.on('closed', () => { viewerWin = null; });
 }
+// ログの窓
+function openLogWin() {
+  if (logWin && !logWin.isDestroyed()) { logWin.show(); logWin.focus(); return; }
+  logWin = new BrowserWindow({
+    width: 640, height: 480, minWidth: 360, minHeight: 240, title: 'ログ', icon: path.join(__dirname, 'icon.png'), autoHideMenuBar: true, backgroundColor: bgColor(),
+    webPreferences: { preload: path.join(__dirname, 'log-preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
+  });
+  logWin.setMenuBarVisibility(false);
+  logWin.loadFile(path.join(__dirname, 'log.html'));
+  logWin.on('closed', () => { logWin = null; });
+}
+ipcMain.on('mv:log-open', () => openLogWin());
+ipcMain.handle('lg:init', () => logBuf);
+ipcMain.on('lg:clear', () => { logBuf.length = 0; });
+ipcMain.on('lg:copy', (_e, text) => { if (typeof text === 'string') clipboard.writeText(text.slice(0, 200000)); });
 // 枠にドラッグされたリンクから、放送(lv番号)を追加する
 ipcMain.on('mv:drop', (e, text) => {
   if (![...views.values()].some(v => v.webContents === e.sender)) return;
@@ -632,8 +850,62 @@ ipcMain.on('mv:player', (_e, id, act) => {
   if (!v || !cls || v.webContents.isDestroyed()) return;
   v.webContents.executeJavaScript(`(() => { const b = document.querySelector('[class*="${cls}"]'); if (b && !b.disabled) b.click(); return !!b; })()`).catch(() => {});
 });
+// 各枠が「コメントできる状態か」を調べて、UIの投稿欄に反映する(タイムシフト=放送終了後の視聴では、投稿できない)
+const CSTATE_JS = `(() => {
+  let ended = false;
+  try {
+    const el = document.getElementById('embedded-data');
+    const p = el && JSON.parse(el.getAttribute('data-props') || '{}');
+    const st = p && p.program && p.program.status;
+    ended = !!st && st !== 'ON_AIR';
+  } catch (e) { /* 無視 */ }
+  const form = document.querySelector('form[class*="___comment-post-form___"]');
+  const box = form && form.querySelector('input[class*="___comment-text-box___"]');
+  const msg = form && form.querySelector('[class*="___disabled-message___"]');
+  const msgOn = !!(msg && getComputedStyle(msg).display !== 'none' && msg.textContent.trim());
+  // 一般会員は、事前の予約がないとタイムシフトを見られない(ページに案内が出る)
+  let premium = false;
+  if (ended) {
+    const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) if (/プレミアム登録が必要/.test(n.nodeValue || '')) { premium = true; break; }
+  }
+  // 一般会員で見られないときは、映像の真ん中に案内を重ねる(見られる状態になったら消す)
+  let box2 = document.getElementById('nmv-notice');
+  if (ended && premium) {
+    if (!box2) {
+      box2 = document.createElement('div'); box2.id = 'nmv-notice';
+      box2.setAttribute('style', 'position:fixed!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;z-index:2147483647!important;max-width:82%!important;padding:16px 24px!important;border-radius:12px!important;background:rgba(0,0,0,.82)!important;color:#fff!important;font:700 16px/1.7 "Yu Gothic UI","Meiryo",sans-serif!important;text-align:center!important;pointer-events:none!important;visibility:visible!important;box-shadow:0 4px 24px rgba(0,0,0,.5)!important');
+      box2.innerHTML = 'タイムシフトの視聴には<br>プレミアム会員が必要です<br><span style="visibility:visible!important;font-weight:400;font-size:13px;opacity:.85">(事前のタイムシフト予約をしていれば、一般会員でも見られます)</span>';
+      document.body.appendChild(box2);
+    }
+  } else if (box2) box2.remove();
+  return { ended, premium, off: ended || !!(box && box.disabled) || msgOn, msg: msgOn ? msg.textContent.trim().slice(0, 60) : '' };
+})()`;
+const noticed = new Set();   // 一般会員の通知を出した枠
+const cstates = new Map();
+setInterval(() => {
+  if (!win || win.isDestroyed()) return;
+  for (const [id, v] of views) {
+    if (v.webContents.isDestroyed()) continue;
+    v.webContents.executeJavaScript(CSTATE_JS).then(s => {
+      if (!s || win.isDestroyed()) return;
+      const why = s.ended ? 'タイムシフトではコメントできません' : (s.msg || (s.off ? 'この枠ではコメントできません' : ''));
+      if (s.ended && s.premium && !noticed.has(id)) {
+        noticed.add(id);
+        const msg = 'タイムシフトの視聴には、プレミアム会員(または、事前のタイムシフト予約)が必要です';
+        appLog(`${id}: ${msg}`, 'WARN');
+      }
+      const key = s.off ? why : '';
+      if (cstates.get(id) === key) return;
+      cstates.set(id, key);
+      win.webContents.send('mv:cstate', id, key);
+    }).catch(() => {});
+  }
+  for (const id of [...cstates.keys()]) if (!views.has(id)) { cstates.delete(id); noticed.delete(id); }
+}, 2000);
 ipcMain.on('mv:open-viewer', () => openViewer());
-ipcMain.handle('vw:init', () => ({ backlog: commentBuf, sources: sourcesList() }));
+ipcMain.handle('vw:init', () => ({ backlog: commentBuf, sources: sourcesList(), modes: Object.fromEntries(liveMode) }));
+ipcMain.on('vw:copy', (_e, t) => { if (typeof t === 'string') clipboard.writeText(t.slice(0, 5000)); });
 ipcMain.on('vw:clear', () => { commentBuf.length = 0; });
 ipcMain.on('vw:ontop', (_e, v) => { if (viewerWin && !viewerWin.isDestroyed()) viewerWin.setAlwaysOnTop(!!v); });
 // コメントは、サイト(nico-ran.stream)のコメントビューアと同じ流し込み(SSE)から受け取る。
@@ -650,8 +922,21 @@ function addLiveItems(id, list) {
   if (commentBuf.length > MAX_BUF) commentBuf.splice(0, commentBuf.length - MAX_BUF);
   pushViewer('vw:comments', items);
 }
-async function liveLoop(id, st) {
-  while (!st.ctl.signal.aborted) {
+// ---- 取得のしかた: まず直接(ニコ生につなぐ)。 つながらなければ、サイト(nico-ran.stream)経由に切り替える ----
+const liveMode = new Map();   // lv番号 -> 'direct' | 'site'
+function setLiveMode(id, mode) {
+  if (liveMode.get(id) === mode) return;
+  appLog(`${id}: コメントの受け取り ${mode === 'direct' ? '開始(直接)' : '切り替え(サイト経由)'}`);
+  liveMode.set(id, mode);
+  pushViewer('vw:mode', Object.fromEntries(liveMode));
+}
+const direct = require('./live-direct.js').make({ fetch: (u, o) => net.fetch(u, o), WebSocket, ua: app.userAgentFallback });
+const sleepAbort = (ms, sig) => new Promise(res => { const t = setTimeout(res, ms); sig.addEventListener('abort', () => { clearTimeout(t); res(); }, { once: true }); });
+
+// サイト経由(SSE)。 約5分たったら戻って、直接をもう一度試す
+async function siteSession(id, st) {
+  const until = Date.now() + 5 * 60 * 1000;
+  while (!st.ctl.signal.aborted && !st.gone && Date.now() < until) {
     let wait = 300;
     try {
       const res = await net.fetch(`${LIVE_API}?lv=${encodeURIComponent(id)}&after=${st.maxN}`, { signal: st.ctl.signal });
@@ -668,19 +953,58 @@ async function liveLoop(id, st) {
           const ev = (/^event: (.+)$/m.exec(block) || [])[1], data = (/^data: (.*)$/m.exec(block) || [])[1];
           if (!ev || data === undefined) continue;
           let j; try { j = JSON.parse(data); } catch { continue; }
-          if (ev === 'c' && Array.isArray(j)) { st.fails = 0; for (const c of j) if (c.n > st.maxN) st.maxN = c.n; addLiveItems(id, j); }
+          if (ev === 'c' && Array.isArray(j)) { st.fails = 0; emitChats(id, st, j); }
           else if (ev === 'bye') { if (j && j.after > st.maxN) st.maxN = j.after; }
           else if (ev === 'gone') { st.gone = true; }
           else if (ev === 'srverr') { st.fails++; wait = Math.min(8000, 1500 * st.fails); }
         }
       }
-      if (st.gone) return;
     } catch (e) {
       if (st.ctl.signal.aborted) return;
       st.fails++; wait = Math.min(8000, 1500 * st.fails);
     }
-    await new Promise(r => setTimeout(r, wait));
+    await sleepAbort(wait, st.ctl.signal);
   }
+}
+// 直接・サイト経由のどちらから来たコメントも、番号で重複を除いて送る
+function emitChats(id, st, list) {
+  if (!st.seen) st.seen = new Set();
+  const fresh = [];
+  for (const c of list) {
+    if (!c || typeof c.x !== 'string') continue;
+    if (c.n) { if (st.seen.has(c.n)) continue; st.seen.add(c.n); if (c.n > st.maxN) st.maxN = c.n; }
+    fresh.push(c);
+  }
+  if (st.seen.size > 3000) { const keep = [...st.seen].slice(-1500); st.seen.clear(); keep.forEach(n => st.seen.add(n)); }
+  addLiveItems(id, fresh.sort((a, b) => (a.n || 0) - (b.n || 0)));
+}
+async function liveLoop(id, st) {
+  let directFails = 0;
+  while (!st.ctl.signal.aborted && !st.gone) {
+    if (st.mode === 'direct') {
+      const rc = new AbortController();
+      st.ctl.signal.addEventListener('abort', () => rc.abort(), { once: true });
+      let gotSeg = false;
+      // 15秒たっても、コメントの流れにつながれなければ、いったん諦める
+      const guard = setTimeout(() => { if (!gotSeg) rc.abort(); }, 15000);
+      setLiveMode(id, 'direct');
+      try {
+        await direct.run(id, rc.signal, { onSegment: () => { gotSeg = true; }, onChats: list => emitChats(id, st, list) });
+      } catch (e) { if (e && e.gone) st.gone = true; }
+      clearTimeout(guard); rc.abort();
+      if (st.ctl.signal.aborted || st.gone) break;
+      if (gotSeg) { directFails = 0; await sleepAbort(2000, st.ctl.signal); continue; }
+      if (++directFails >= 2) { appLog(`${id}: 直接つながらないため、サイト経由に切り替えます`, 'WARN'); st.mode = 'site'; directFails = 0; continue; }
+      await sleepAbort(2000, st.ctl.signal);
+    } else {
+      setLiveMode(id, 'site');
+      await siteSession(id, st);
+      if (!st.gone && !st.ctl.signal.aborted) st.mode = 'direct';
+    }
+  }
+  if (st.gone) appLog(`${id}: 放送が終了しました`);
+  liveMode.delete(id);
+  appLog(`${id}: コメントの受け取りを終了`);
 }
 // コメントビューアの窓が開いている間だけ、いま開いている各枠のコメントを受け取る
 function syncLive() {
@@ -688,8 +1012,9 @@ function syncLive() {
   for (const [id, st] of liveReaders) if (!want.has(id) || st.gone) { st.ctl.abort(); liveReaders.delete(id); }
   for (const id of want) {
     if (liveReaders.has(id) || !/^lv\d+$/.test(id)) continue;
-    const st = { ctl: new AbortController(), maxN: 0, fails: 0, gone: false };
+    const st = { ctl: new AbortController(), maxN: 0, fails: 0, gone: false, mode: 'direct' };
     liveReaders.set(id, st);
+    appLog(`${id}: コメントの受け取りを準備`);
     liveLoop(id, st);
   }
 }
@@ -1020,7 +1345,7 @@ ipcMain.on('mv:gift-targets', (_e, list) => {
 ipcMain.on('gift:pick', (_e, id) => giftLoad(id));
 ipcMain.on('gift:ready', () => giftPush());
 ipcMain.on('gift:reopen', () => { if (giftTarget) giftLoad(giftTarget); });
-ipcMain.on('mv:reload', (_e, id) => { const v = views.get(id); if (v) v.webContents.loadURL(WATCH(id)); });
+ipcMain.on('mv:reload', (_e, id) => { const v = views.get(id); noticed.delete(id); if (v) v.webContents.loadURL(WATCH(id)); });
 ipcMain.on('mv:external', (_e, id) => { if (ID_RE.test(id)) shell.openExternal(WATCH(id)); });
 ipcMain.handle('mv:auth', () => isLoggedIn().catch(() => false));
 ipcMain.handle('mv:auth-via', () => loginVia);
@@ -1029,6 +1354,8 @@ ipcMain.on('mv:logout', () => { logout(); });
 
 app.setAppUserModelId('dev.nico-multiview');
 app.whenReady().then(() => {
+  appLog('アプリを起動(v' + app.getVersion() + ')');
+  setTimeout(() => { checkPolicy(); setInterval(checkPolicy, 6 * 3600 * 1000); }, 3000);
   // ログインが完了したら(user_session が付いたら)ログイン画面を閉じて全枠を読み込み直す
   ses().cookies.on('changed', async (_e, cookie, _cause, removed) => {
     if (cookie.name !== 'user_session' || !/(^|\.)nicovideo\.jp$/.test(cookie.domain)) return;

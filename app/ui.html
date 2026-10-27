@@ -196,12 +196,22 @@ body.showCmt .foot{display:flex}
     $('#authState').className = loggedIn ? 'in' : '';
     $('#authBtn').textContent = loggedIn ? 'ログアウト' : 'ニコニコにログイン';
     if (menuType === 'set') window.mv.menuData(menuData());
-    document.querySelectorAll('.foot').forEach(f => {
-      const i = f.querySelector('input'), b = f.querySelector('button');
-      i.disabled = b.disabled = !loggedIn;
-      i.placeholder = loggedIn ? 'コメントを入力(Enterで送信)' : 'ログインするとコメントできます';
-    });
+    document.querySelectorAll('.tile').forEach(t => applyFoot(t.dataset.id));
   }
+  // 投稿欄: 未ログイン、またはその枠がコメント不可(タイムシフトなど)のときは無効にして、理由を表示する
+  const cstate = new Map();   // 枠 -> コメントできない理由(できるときは空)
+  function applyFoot(id) {
+    const t = [...document.querySelectorAll('.tile')].find(x => x.dataset.id === id); if (!t) return;
+    const f = t.querySelector('.foot'); if (!f) return;
+    const i = f.querySelector('input'), b = f.querySelector('button'), why = cstate.get(id) || '';
+    const off = !loggedIn || !!why;
+    i.disabled = b.disabled = off;
+    if (off && why) i.value = '';
+    i.placeholder = !loggedIn ? 'ログインするとコメントできます' : (why || 'コメントを入力(Enterで送信)');
+    i.title = off ? i.placeholder : '';
+  }
+  window.mv.onNotice((id, text) => say(`${nameOf(id)}: ${text}`, true));
+  window.mv.onCState((id, why) => { cstate.set(id, why); applyFoot(id); });
 
   /* ---------- ラベル(放送者名) ---------- */
   function updateTags() {
@@ -291,8 +301,8 @@ body.showCmt .foot{display:flex}
     input.disabled = btn.disabled = true;
     let r;
     try { r = await window.mv.comment(id, text, use184); } catch { r = { ok: false, error: '送信に失敗しました' }; }
-    input.disabled = btn.disabled = !loggedIn;
-    if (r && r.ok) { input.value = ''; }   // 成功時はメッセージを出さない
+    applyFoot(id);
+    if (r && r.ok) { input.value = ''; if (r.warn) say(`${nameOf(id)}: ${r.warn}`, true); }   // 成功時は、通常メッセージを出さない
     else say(`${nameOf(id)}: ${(r && r.error) || '送信できませんでした'}`, true);
     if (loggedIn) input.focus();
   }
@@ -367,6 +377,7 @@ body.showCmt .foot{display:flex}
       let t = existing.get(id);
       if (t) existing.delete(id); else t = makeTile(id);
       if (stage.children[i] !== t) stage.insertBefore(t, stage.children[i] || null);
+      applyFoot(id);
       const s = t.querySelector('.snd'), on = audioIds.includes(id);
       s.textContent = on ? '🔊' : '🔇'; s.classList.toggle('on', on);
     });
@@ -490,7 +501,7 @@ body.showCmt .foot{display:flex}
   const setBtn = $('#setBtn');
   let appVersion = '', updateInfo = null;
   const checkUpdate = () => window.mv.updateCheck().then(r => {
-    updateInfo = r && r.ok && r.newer ? { latest: r.latest } : null;
+    updateInfo = r && r.ok && r.newer ? { latest: r.latest, auto: !!r.auto } : null;
     setBtn.textContent = updateInfo ? '⚙ 設定 🔔' : '⚙ 設定';
     setBtn.title = updateInfo ? `新しいバージョン v${updateInfo.latest} があります` : 'テーマ・プレイヤーのみ・ログイン';
     if (menuType === 'set') window.mv.menuData(menuData());
@@ -504,7 +515,7 @@ body.showCmt .foot{display:flex}
   $('#clearBtn').addEventListener('click', () => { items = []; audioIds = []; render(); });
   $('#authBtn').addEventListener('click', () => {
     if (loggedIn) { if (confirm('ニコニコからログアウトしますか?')) window.mv.logout(); }
-    else window.mv.login();
+    else { window.mv.login(); say('入れないときは、設定の「ブラウザでログイン」を使えます'); }
   });
   window.mv.onBrowserLogin(r => { if (r && !r.ok && r.error) say(r.error); });
   window.mv.onAuth((v, via) => {
@@ -588,7 +599,13 @@ body.showCmt .foot{display:flex}
   window.mv.onMenuAct((action, p) => {
     if (action === 'set-theme') { themeSel.value = String(p); themeSel.dispatchEvent(new Event('change')); window.mv.menuData(menuData()); return; }
     if (action === 'set-po') { poEl.checked = !!p; poEl.dispatchEvent(new Event('change')); window.mv.menuData(menuData()); return; }
+    if (action === 'set-log') { window.mv.logOpen(); return; }
     if (action === 'set-update') { window.mv.openRelease(); return; }
+    if (action === 'set-update-apply') {
+      say('更新をダウンロードしています…');
+      window.mv.updateApply().then(r => { if (r && r.ok) say('更新して、再起動します'); else say((r && r.error) || '更新できませんでした', true); }).catch(() => say('更新できませんでした', true));
+      return;
+    }
     if (action === 'set-auth') { $('#authBtn').click(); return; }
     if (action === 'set-browser') { say('ブラウザが開きます。ログインすると、自動でこのアプリに反映されます'); window.mv.browserLogin(); return; }
     if (action === 'sug-hover') { sgIdx = Number(p); return; }

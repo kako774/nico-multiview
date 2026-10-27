@@ -36,14 +36,16 @@ input[type=text]:focus{outline:2px solid var(--accent)}
 .chip{display:flex;align-items:center;gap:5px;font-size:12px;padding:2px 9px;border-radius:999px;border:1px solid var(--line);background:var(--chip);cursor:pointer;user-select:none;max-width:100%}
 .chip i{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
 .chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lamp{display:inline-block;width:9px;height:9px;margin-right:6px;border-radius:50%;background:#2fbf5b;box-shadow:0 0 0 2px color-mix(in srgb,#2fbf5b 28%,transparent),0 0 7px #2fbf5b;vertical-align:baseline;position:relative;top:0}
+#mode{display:inline-flex;align-items:center;color:var(--sub);font-size:12px;white-space:nowrap}
 .chip.off{opacity:.4;text-decoration:line-through}
 #list{flex:1 1 auto;min-height:0;overflow-y:auto;padding:4px 0}
-.line{display:grid;grid-template-columns:6.2em 3.6em 4.4em 10px 9.5em 1fr;gap:0 8px;align-items:baseline;padding:4px 10px;font-size:var(--fs);line-height:1.45;border-bottom:1px solid var(--line)}
+.line{display:grid;grid-template-columns:3.6em 4.4em 10px 9.5em minmax(0,9em) 1fr;gap:0 8px;align-items:baseline;padding:4px 10px;font-size:var(--fs);line-height:1.45;border-bottom:1px solid var(--line)}
 .line{background:var(--tint,transparent)}
 .line:hover{background:var(--hover)}
 .line.hide,.line.ng{display:none}
 .line.sel{background:var(--hl);font-weight:700}
-.s{font-size:.75em;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-left:3px solid currentColor;padding-left:5px}
+.s{justify-self:start;max-width:100%;box-sizing:border-box;font-size:.75em;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:1.5px solid currentColor;border-radius:7px;padding:0 7px;line-height:1.5;background:color-mix(in srgb,currentColor 12%,transparent)}
 .no{color:var(--sub);font-size:.8em;text-align:right;font-variant-numeric:tabular-nums}
 .t{color:var(--sub);font-size:.8em;font-variant-numeric:tabular-nums}
 .d{width:9px;height:9px;border-radius:50%;align-self:center;cursor:pointer}
@@ -53,11 +55,12 @@ input[type=text]:focus{outline:2px solid var(--accent)}
 .x{min-width:0;word-break:break-all;user-select:text;white-space:pre-wrap}
 
 @media (max-width:680px){
-  .line{grid-template-columns:minmax(0,6.2em) auto auto 10px minmax(0,1fr);gap:1px 8px;padding:5px 10px}
+  .line{grid-template-columns:auto auto 10px minmax(0,1fr) minmax(0,9em);gap:1px 8px;padding:5px 10px}
+  .s{justify-self:end}
   .x{grid-column:1 / -1;grid-row:2}
   .no{text-align:left}
 }
-@media (max-width:420px){ .no{display:none} .line{grid-template-columns:minmax(0,6.2em) auto 10px minmax(0,1fr)} }
+@media (max-width:420px){ .no{display:none} .line{grid-template-columns:auto 10px minmax(0,1fr) minmax(0,9em)} }
 #list{overflow-x:hidden}
 #empty{color:var(--sub);text-align:center;padding:36px 16px;line-height:1.9}
 .menu{position:fixed;z-index:50;min-width:15em;max-width:88vw;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 28px #0006;padding:6px;display:grid;gap:4px}
@@ -84,6 +87,7 @@ input[type=text]:focus{outline:2px solid var(--accent)}
   <input id="q" type="text" placeholder="コメントを検索" aria-label="コメントを検索">
   <button id="fm" type="button" title="文字を小さく">A−</button>
   <button id="fp" type="button" title="文字を大きく">A＋</button>
+  <span id="mode" class="chk" title="コメントを受け取っています"></span>
   <label class="chk"><input id="top" type="checkbox">最前面</label>
   <button id="ngb" type="button" title="NGユーザー・NGワードの確認と解除">NG</button>
   <button id="clr" type="button">クリア</button>
@@ -154,7 +158,7 @@ input[type=text]:focus{outline:2px solid var(--accent)}
     const n = document.createElement('span'); n.className = 'n' + (it.nm ? ' nick' : ''); n.textContent = dispName(it); n.title = (it.u && it.u[0] === 'h' ? '匿名(184)の投稿者 ID ' + it.u.slice(1) : n.textContent) + '(押すとメニュー)';
     if (ucol[it.u]) { n.style.color = ucol[it.u]; l.style.setProperty('--tint', tintOf(ucol[it.u])); }
     const x = document.createElement('span'); x.className = 'x'; x.textContent = it.text;
-    l.append(s, no, t, d, n, x);
+    l.append(no, t, d, n, s, x);
     l._it = it;
     if (isNg(it)) l.classList.add('ng');
     if (selU && it.u === selU) l.classList.add('sel');
@@ -192,6 +196,7 @@ input[type=text]:focus{outline:2px solid var(--accent)}
     const m = document.createElement('div'); m.className = 'menu'; menu = m;
     const h = document.createElement('div'); h.className = 'h'; h.textContent = it.u && it.u[0] === 'h' ? dispName(it) + '  ID ' + it.u.slice(1) : dispName(it); m.appendChild(h);
     const item = (label, fn) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.addEventListener('click', ev => { ev.stopPropagation(); fn(); }); m.appendChild(b); };
+    item('コメントをコピー', () => { window.vw.copy(it.text); closeMenu(); });
     item('色をつける…', () => colorMenu(it, anchor));
     const cnt = store.filter(s => s.u === it.u).length;
     item(`コメント履歴(${cnt}件)`, () => { closeMenu(); history(it); });
@@ -281,8 +286,17 @@ input[type=text]:focus{outline:2px solid var(--accent)}
     (src || []).forEach(s => { names.set(s.id, s.name); color(s.id); });
     renderChips(); refreshNames();
   });
+  const showMode = m => {
+    const vals = Object.values(m || {}), el = $('#mode');
+    el.textContent = ''; el.classList.toggle('on', vals.length > 0);
+    if (!vals.length) return;
+    const lamp = document.createElement('i'); lamp.className = 'lamp';
+    el.append(lamp, document.createTextNode('接続中'));
+  };
+  window.vw.onMode(showMode);
   window.vw.onComments(items => add(items));
-  window.vw.init().then(({ backlog, sources }) => {
+  window.vw.init().then(({ backlog, sources, modes }) => {
+    showMode(modes);
     (sources || []).forEach(s => { names.set(s.id, s.name); color(s.id); });
     renderChips(); add(backlog || []); list.scrollTop = list.scrollHeight;
   });

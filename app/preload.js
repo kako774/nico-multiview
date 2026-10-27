@@ -28,6 +28,8 @@ contextBridge.exposeInMainWorld('mv', {
   giftOpen: id => ipcRenderer.send('mv:gift-open', id || ''),
   giftTargets: list => ipcRenderer.send('mv:gift-targets', list),
   updateCheck: () => ipcRenderer.invoke('mv:update-check'),
+  updateApply: () => ipcRenderer.invoke('mv:update-apply'),
+  logOpen: () => ipcRenderer.send('mv:log-open'),
   openRelease: () => ipcRenderer.send('mv:open-release'),
   version: () => ipcRenderer.invoke('mv:version'),
   overlay: (on, rect) => ipcRenderer.send('mv:overlay', !!on, rect),
@@ -42,5 +44,7 @@ contextBridge.exposeInMainWorld('mv', {
   dragStart: id => ipcRenderer.send('mv:drag-start', id),
   dragEnd: () => ipcRenderer.send('mv:drag-end'),
   onDrag: cb => ipcRenderer.on('mv:drag', (_e, d) => cb(d)),
+  onNotice: cb => ipcRenderer.on('mv:notice', (_e, id, text) => cb(id, text)),
+  onCState: cb => ipcRenderer.on('mv:cstate', (_e, id, why) => cb(id, why || '')),
   onInfo: cb => ipcRenderer.on('mv:info', (_e, id, info) => cb(id, info)),
 });

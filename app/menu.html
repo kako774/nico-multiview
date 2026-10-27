@@ -48,6 +48,8 @@ body.sugmode #root{padding:0}
 .srow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0}
 .srow+.srow{border-top:1px solid var(--line)}
 .srow.upd{flex-wrap:wrap;color:var(--accent);font-size:13px}
+.hint{padding:0 0 6px;margin-top:-2px}
+.lnk{background:none;border:0;padding:0;font:inherit;font-size:12px;color:var(--accent);text-decoration:underline;cursor:pointer;text-align:left}
 .srow .ok{color:var(--ok);font-size:12px}
 .ver{text-align:right;font-size:12px;color:var(--sub);padding-top:6px;border-top:1px solid var(--line)}
 </style></head><body><div id="root"></div>
@@ -163,9 +165,13 @@ body.sugmode #root{padding:0}
     row('プレイヤーのみ', cb);
     const au = el('div', 'srow'), st = el('span', data.loggedIn ? 'ok' : '', data.loggedIn ? 'ログイン中' + (data.loginVia ? ' (' + data.loginVia + ')' : '') : '未ログイン');
     au.append(st, btn(data.loggedIn ? 'ログアウト' : 'ニコニコにログイン', () => window.menu.act('set-auth', null, true))); root.appendChild(au);
-    if (!data.loggedIn) { const im = el('div', 'srow'); im.append(el('span', '', 'Googleで入れないとき'), btn('ブラウザでログイン', () => window.menu.act('set-browser', null, true))); root.appendChild(im); }
+    if (!data.loggedIn) {
+      const hint = el('div', 'hint'); const lk = el('button', 'lnk', 'ブラウザでログイン'); lk.type = 'button'; lk.title = 'Googleなどで入れないときは、普段のブラウザ(Chrome / Edge)でログインします';
+      lk.addEventListener('click', () => window.menu.act('set-browser', null, true)); hint.appendChild(lk); root.appendChild(hint);
+    }
+    const lg = el('div', 'srow'); lg.append(el('span', '', '動作ログ'), btn('ログ', () => window.menu.act('set-log', null, true))); root.appendChild(lg);
     if (data.update) {
-      const up = el('div', 'srow upd'); up.append(el('span', '', `🔔 新しいバージョン v${data.update.latest} があります`), btn('ダウンロードページを開く', () => window.menu.act('set-update', null, true)));
+      const up = el('div', 'srow upd'); up.append(el('span', '', `🔔 新しいバージョン v${data.update.latest} があります`), data.update.auto ? btn('更新して再起動', () => window.menu.act('set-update-apply', null, true)) : btn('ダウンロードページを開く', () => window.menu.act('set-update', null, true)));
       root.appendChild(up);
     }
     if (data.appVersion) root.appendChild(el('div', 'ver', 'ニコ生マルチビュー v' + data.appVersion));

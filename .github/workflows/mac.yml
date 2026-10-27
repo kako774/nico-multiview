@@ -1,0 +1,59 @@
+name: mac
+# Mac用(試験版)。 mac-release ブランチへのpushで動き、GitHubの「プレリリース」にZIPを載せる。
+on:
+  push:
+    branches: [mac-release]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Apple Silicon(arm64)と Intel(x64)の両方を、この1台で作る
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: |
+          for A in arm64 x64; do
+            npx electron-builder --mac dir --$A
+            APP=$(ls -d dist/mac*/NicoMultiView.app | head -1)
+            codesign --force --deep -s - "$APP"
+            V=$(node -p "require('./package.json').version")
+            ditto -c -k --keepParent "$APP" "NicoMultiView-mac-$A-$V.zip"
+            rm -rf dist
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac
+          path: app/NicoMultiView-mac-*.zip
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: バージョンを読む
+        id: ver
+        run: echo "v=$(node -p "require('./app/package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: out/*.zip
+          tag_name: v${{ steps.ver.outputs.v }}-mac
+          name: v${{ steps.ver.outputs.v }} Mac版(試験版)
+          prerelease: true
+          body: |
+            Mac用の試験版です。作者はMacで動作確認できていません。
+            - Apple Silicon(M1以降)は **arm64**、Intel Macは **x64** をダウンロードしてください。
+            - 署名・公証をしていないため、初回は「右クリック → 開く」で起動してください。「壊れている」と出るときは、ターミナルで `xattr -dr com.apple.quarantine NicoMultiView.app` を実行してください。
+            - 不具合は、わかる範囲で教えてください。

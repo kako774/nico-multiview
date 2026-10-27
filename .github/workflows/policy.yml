@@ -1,0 +1,37 @@
+name: 利用できる最低バージョンを決める
+# GitHub の Actions 画面から「Run workflow」で実行する。 minVersion より古い版は、起動時に案内が出て使えなくなる。
+# 解除するときは、minVersion を 0.0 にして実行する。
+on:
+  workflow_dispatch:
+    inputs:
+      minVersion:
+        description: 'この版より古いものは使えなくする(例: 1.0.6。解除は 0.0)'
+        required: true
+      message:
+        description: '利用者に見せる補足(任意、300字まで)'
+        required: false
+        default: ''
+permissions:
+  contents: write
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 方針に署名する
+        working-directory: app
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+          MIN_VERSION: ${{ inputs.minVersion }}
+          POLICY_MESSAGE: ${{ inputs.message }}
+        run: node tools/sign-policy.mjs policy.json
+      - name: 公開する(policy という名前のリリースに上書き)
+        working-directory: app
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view policy >/dev/null 2>&1 || gh release create policy --prerelease --title "policy" --notes "利用できる最低バージョンの方針(自動更新されます。ダウンロード不要)"
+          gh release upload policy policy.json --clobber

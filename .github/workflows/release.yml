@@ -22,6 +22,25 @@ jobs:
       - run: npx electron-builder --win dir --x64
       - run: node tools/seticon.mjs dist/win-unpacked/NicoMultiView.exe icon.ico
       - run: node tools/setver.mjs dist/win-unpacked/NicoMultiView.exe $(node -p "require('./package.json').version")
+      - name: アプリ内の更新用ファイル(app.asar と update.json)を作る
+        shell: pwsh
+        run: |
+          Copy-Item 'dist/win-unpacked/resources/app.asar' 'app.asar'
+          $h = (Get-FileHash 'app.asar' -Algorithm SHA256).Hash.ToLower()
+          $ver = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $el = (node -p "require('electron/package.json').version").Trim()
+          $o = [ordered]@{ version = $ver; file = 'app.asar'; sha256 = $h; size = (Get-Item 'app.asar').Length; electron = $el }
+          ($o | ConvertTo-Json) | Out-File -FilePath 'update.json' -Encoding utf8NoBOM
+      - name: 更新用ファイルに電子署名をつける
+        shell: bash
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          if [ -z "$UPDATE_SIGNING_KEY" ]; then
+            echo "::warning::UPDATE_SIGNING_KEY が未設定のため、署名なしで公開します(アプリ内の自動更新は使えません)"
+          else
+            node tools/sign-update.mjs update.json
+          fi
       - name: フォルダをまとめてZIPにする
         shell: pwsh
         run: |
@@ -39,7 +58,10 @@ jobs:
           "tag=v$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
       - uses: softprops/action-gh-release@v2
         with:
-          files: app/NicoMultiView-win.zip
+          files: |
+            app/NicoMultiView-win.zip
+            app/app.asar
+            app/update.json
           tag_name: ${{ steps.ver.outputs.tag }}
           name: ${{ steps.ver.outputs.tag }}
           body_path: app/release-notes.md

@@ -1,7 +1,18 @@
 'use strict';
-const { app, BrowserWindow, WebContentsView, ipcMain, shell, session, screen, nativeTheme, net, dialog, clipboard, Menu } = require('electron');
+const { app, BrowserWindow, WebContentsView, ipcMain, shell, session, screen, nativeTheme, net, dialog, clipboard, ClipboardItem, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
+
+// 多重起動の禁止: 2つ目を開くと、同じ保存場所(Cookie)を取り合ってログインが外れるため、エラーを出して終了する
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.whenReady().then(() => {
+    dialog.showMessageBoxSync({ type: 'error', title: 'ニコ生マルチビュー', message: 'ニコ生マルチビューは、すでに起動しています。', detail: '2つ目を起動すると、ログイン状態が解除されることがあるため、起動できません。\nすでに開いている窓を使ってください(見当たらないときは、タスクバーを確認してください)。', buttons: ['OK'] });
+    app.exit(0);
+  });
+} else {
+  app.on('second-instance', () => { if (win && !win.isDestroyed()) { if (win.isMinimized()) win.restore(); win.show(); win.focus(); } });
+}
 
 // ニコニコのログイン状態を全枠で共有・保存するためのパーティション
 const PARTITION = 'persist:nico';
@@ -950,6 +961,20 @@ function openLogWin() {
   logWin.on('closed', () => { logWin = null; });
 }
 ipcMain.on('mv:log-open', () => openLogWin());
+// バージョン情報(Electron などのバージョン)を表示する。「コピー」で、そのまま貼り付けられる
+ipcMain.on('mv:about', async () => {
+  const pv = process.versions;
+  const text = [
+    `ニコ生マルチビュー v${app.getVersion()}`,
+    `Electron ${pv.electron}`,
+    `Chromium ${pv.chrome}`,
+    `Node.js ${pv.node}`,
+    `V8 ${pv.v8}`,
+    `OS ${process.platform} ${process.arch} (${require('os').release()})`,
+  ].join('\n');
+  const r = await dialog.showMessageBox(win && !win.isDestroyed() ? win : undefined, { type: 'info', title: 'バージョン情報', message: 'ニコ生マルチビュー', detail: text, buttons: ['閉じる', 'コピー'], defaultId: 0, cancelId: 0, noLink: true });
+  if (r.response === 1) { try { await clipboard.writeText(text); } catch { /* 無視 */ } }
+});
 ipcMain.handle('lg:init', () => logBuf);
 ipcMain.on('lg:clear', () => { logBuf.length = 0; });
 ipcMain.on('lg:copy', (_e, text) => { if (typeof text === 'string') clipboard.writeText(text.slice(0, 200000)); });
@@ -981,21 +1006,30 @@ const CSTATE_JS = `(() => {
   const msgOn = !!(msg && getComputedStyle(msg).display !== 'none' && msg.textContent.trim());
   // 一般会員は、事前の予約がないとタイムシフトを見られない(ページに案内が出る)
   let premium = false;
+  let priv = false;   // 配信者がタイムシフトを公開していない番組
   if (ended) {
     const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    for (let n = w.nextNode(); n; n = w.nextNode()) if (/プレミアム登録が必要/.test(n.nodeValue || '')) { premium = true; break; }
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      const t = n.nodeValue || '';
+      if (/プレミアム登録が必要/.test(t)) { premium = true; break; }
+      if (/タイムシフト非公開/.test(t)) { priv = true; break; }
+    }
   }
   // 一般会員で見られないときは、映像の真ん中に案内を重ねる(見られる状態になったら消す)
   let box2 = document.getElementById('nmv-notice');
-  if (ended && premium) {
+  const kind = ended && premium ? 'p' : (ended && priv ? 'n' : '');
+  if (kind) {
     if (!box2) {
       box2 = document.createElement('div'); box2.id = 'nmv-notice';
       box2.setAttribute('style', 'position:fixed!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;z-index:2147483647!important;max-width:82%!important;padding:16px 24px!important;border-radius:12px!important;background:rgba(0,0,0,.82)!important;color:#fff!important;font:700 16px/1.7 "Yu Gothic UI","Meiryo",sans-serif!important;text-align:center!important;pointer-events:none!important;visibility:visible!important;box-shadow:0 4px 24px rgba(0,0,0,.5)!important');
-      box2.innerHTML = 'タイムシフトの視聴には<br>プレミアム会員が必要です<br><span style="visibility:visible!important;font-weight:400;font-size:13px;opacity:.85">(事前のタイムシフト予約をしていれば、一般会員でも見られます)</span>';
+    }
+    if (box2.dataset.k !== kind) {
+      box2.dataset.k = kind;
+      box2.innerHTML = kind === 'p' ? 'タイムシフトの視聴には<br>プレミアム会員が必要です<br><span style="visibility:visible!important;font-weight:400;font-size:13px;opacity:.85">(事前のタイムシフト予約をしていれば、一般会員でも見られます)</span>' : 'タイムシフト非公開の番組です<br><span style="visibility:visible!important;font-weight:400;font-size:13px;opacity:.85">(配信者が公開していないため、視聴できません)</span>';
       document.body.appendChild(box2);
     }
   } else if (box2) box2.remove();
-  return { ended, premium, off: ended || !!(box && box.disabled) || msgOn, msg: msgOn ? msg.textContent.trim().slice(0, 60) : '' };
+  return { ended, premium, priv, off: ended || !!(box && box.disabled) || msgOn, msg: msgOn ? msg.textContent.trim().slice(0, 60) : '' };
 })()`;
 const noticed = new Set();   // 一般会員の通知を出した枠
 const cstates = new Map();
@@ -1011,6 +1045,7 @@ setInterval(() => {
         const msg = 'タイムシフトの視聴には、プレミアム会員(または、事前のタイムシフト予約)が必要です';
         appLog(`${id}: ${msg}`, 'WARN');
       }
+      if (s.ended && s.priv && !noticed.has(id)) { noticed.add(id); appLog(`${id}: タイムシフト非公開の番組です`, 'WARN'); }
       const key = s.off ? why : '';
       if (cstates.get(id) === key) return;
       cstates.set(id, key);
@@ -1327,7 +1362,6 @@ ipcMain.handle('mv:follow-list', async () => {
       list = r.list;
     }
     const seen = new Set(); list = list.filter(x => /^lv\d+$/.test(x.id) && !seen.has(x.id) && seen.add(x.id)).slice(0, 60);
-    appLog(`フォロー中の放送: ${list.length}件`);
     return { ok: true, list };
   } catch (e) {
     appLog('フォロー中の放送の取得に失敗: ' + String(e && e.message || e).slice(0, 80), 'WARN');
@@ -1557,6 +1591,73 @@ ipcMain.on('gift:pick', (_e, id) => giftLoad(id));
 ipcMain.on('gift:ready', () => giftPush());
 ipcMain.on('gift:reopen', () => { if (giftTarget) giftLoad(giftTarget); });
 ipcMain.on('mv:reload', (_e, id) => { const v = views.get(id); noticed.delete(id); if (v) v.webContents.loadURL(WATCH(id)); });
+// この枠の映像(流れるコメントごと)を、クリップボードにコピーして、ピクチャのフォルダにPNGで保存する
+const shotBase = dir => {
+  if (typeof dir === 'string' && dir && path.isAbsolute(dir)) return dir;
+  for (const k of ['pictures', 'documents', 'userData']) { try { const b = app.getPath(k); if (b) return path.join(b, 'ニコ生マルチビュー'); } catch { /* 次へ */ } }
+  return path.join(app.getPath('userData'), 'shots');
+};
+ipcMain.handle('mv:shot-pick', async (_e, cur) => {
+  const r = await dialog.showOpenDialog(win, { title: 'スクリーンショットの保存先', defaultPath: shotBase(cur), properties: ['openDirectory', 'createDirectory'] });
+  return r.canceled || !r.filePaths[0] ? { dir: '' } : { dir: r.filePaths[0] };
+});
+ipcMain.on('mv:log', (_e, level, msg) => { if (typeof msg === 'string') appLog(msg.slice(0, 200), level === 'WARN' ? 'WARN' : 'INFO'); });
+ipcMain.on('mv:shot-open', (_e, dir) => { const d = shotBase(dir); try { fs.mkdirSync(d, { recursive: true }); } catch { /* 無視 */ } shell.openPath(d); });
+ipcMain.handle('mv:shot', async (_e, id, label, dirPref) => {
+  let step = '開始';
+  try {
+    const v = ID_RE.test(String(id)) && views.get(id);
+    if (!v || v.webContents.isDestroyed()) return { ok: false, error: '枠が見つかりません' };
+    step = '映像の取り込み';
+    const wc = v.webContents;
+    try { wc.invalidate(); } catch { /* 無視 */ }
+    // 映像の部分だけを撮る(黒い余白は含めない)。ページの中の video の、実際に映像が出ている範囲を求める
+    let rect = null;
+    try {
+      rect = await wc.executeJavaScript(`(() => {
+        let best = null, area = 0;
+        document.querySelectorAll('video').forEach(v => { const r = v.getBoundingClientRect(); if (r.width * r.height > area && v.videoWidth > 0) { best = v; area = r.width * r.height; } });
+        if (!best) return null;
+        const r = best.getBoundingClientRect(), vw = best.videoWidth, vh = best.videoHeight, k = Math.min(r.width / vw, r.height / vh);
+        const w = vw * k, h = vh * k, x = r.left + (r.width - w) / 2, y = r.top + (r.height - h) / 2;
+        const X = Math.max(0, Math.round(x)), Y = Math.max(0, Math.round(y));
+        return { x: X, y: Y, width: Math.min(Math.round(w), innerWidth - X), height: Math.min(Math.round(h), innerHeight - Y) };
+      })()`);
+    } catch { rect = null; }
+    if (rect && !(rect.width > 8 && rect.height > 8)) rect = null;
+    const cap = r => Promise.race([r ? wc.capturePage(r) : wc.capturePage(), new Promise((_, rej) => setTimeout(() => rej(new Error('時間切れ')), 6000))]);
+    let img = await cap(rect);
+    if (!img || img.isEmpty()) {
+      const b = v.getBounds();
+      img = await cap({ x: 0, y: 0, width: Math.max(1, b.width), height: Math.max(1, b.height) });
+    }
+    if (!img || img.isEmpty()) return { ok: false, error: '映像を取り込めませんでした(空の画像)' };
+    step = 'コピー';
+    let copied = false;
+    const png = img.toPNG();
+    try {
+      // Electron 45 のクリップボードは、非同期の write() に ClipboardItem を渡す形
+      if (typeof clipboard.write === 'function' && typeof ClipboardItem === 'function') {
+        await clipboard.write([new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })]);
+        copied = true;
+      } else if (typeof clipboard.writeImage === 'function') { clipboard.writeImage(img); copied = true; }
+    } catch (e) { appLog('スクショのコピーに失敗(本体側): ' + String(e && e.message || e).slice(0, 80), 'WARN'); }
+    step = '保存';
+    const dir = shotBase(dirPref);
+    fs.mkdirSync(dir, { recursive: true });
+    const d = new Date(), z = n => String(n).padStart(2, '0');
+    const stamp = `${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}`;
+    const nm = String(label || '').replace(/[^0-9A-Za-z\u3040-\u30ff\u3400-\u9fff_-]+/g, '_').slice(0, 30);
+    const file = path.join(dir, `${nm ? nm + '_' : ''}${id}_${stamp}.png`);
+    fs.writeFileSync(file, png);
+    appLog('スクリーンショットを保存しました' + (copied ? '(クリップボードにもコピー)' : '') + ': ' + file);
+    return { ok: true, file, png: copied ? null : png };   // 本体側でコピーできなかったときは、画面側(ui.html)でコピーする
+  } catch (e) {
+    const m = String(e && e.message || e).slice(0, 80);
+    appLog(`スクリーンショットに失敗(${step}): ${m}`, 'WARN');
+    return { ok: false, error: `撮影に失敗しました(${step}: ${m})` };
+  }
+});
 ipcMain.on('mv:external', (_e, id) => { if (ID_RE.test(id)) shell.openExternal(WATCH(id)); });
 ipcMain.handle('mv:auth', () => isLoggedIn().catch(() => false));
 ipcMain.handle('mv:auth-via', () => loginVia);
@@ -1565,6 +1666,7 @@ ipcMain.on('mv:logout', () => { logout(); });
 
 app.setAppUserModelId('dev.nico-multiview');
 app.whenReady().then(() => {
+  if (!gotLock) return;   // 多重起動の2つ目は、ここから先(ウィンドウ作成など)を行わない
   if (process.platform !== 'darwin') Menu.setApplicationMenu(null);   // Altキーで出る「File / Edit / View / Window」のメニューを出さない
   appLog('アプリを起動(v' + app.getVersion() + ')');
   logUpdateResult();

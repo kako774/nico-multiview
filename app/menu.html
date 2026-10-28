@@ -197,12 +197,21 @@ body.sugmode #root{padding:0}
     const ea = el('input'); ea.type = 'checkbox'; ea.checked = !!data.evAudioAll; ea.title = 'ギフトイベントの追跡で並んだ枠すべての音声を出します(OFFだと1位の枠だけ)';
     ea.addEventListener('change', () => window.menu.act('set-eaa', ea.checked, true));
     row('ギフトイベントは全枠の音声を出す', ea);
+    const so = el('input'); so.type = 'checkbox'; so.checked = !!data.singleOpen; so.title = 'ONにすると、フォロー中・検索・URL貼り付けで開くとき、いまの枠を閉じて、その放送だけを開きます(ギフトイベントは対象外)';
+    so.addEventListener('change', () => window.menu.act('set-so', so.checked, true));
+    row('追加せず1枠だけで開く', so);
     const hs = el('input'); hs.type = 'checkbox'; hs.checked = !data.hideSrcName; hs.title = 'OFFにすると、コメントビューアの各行の右端の放送者名(枠)を表示しません';
     hs.addEventListener('change', () => window.menu.act('set-hsn', hs.checked, true));
     row('コメビューアに放送者名を表示', hs);
     const tp = el('input'); tp.type = 'checkbox'; tp.checked = !!data.alwaysTop; tp.title = 'ONにすると、メインの窓を、ほかの窓より手前(最前面)に表示し続けます';
     tp.addEventListener('change', () => window.menu.act('set-top', tp.checked, true));
     row('最前面に表示', tp);
+    const sd = el('div'); sd.style.cssText = 'padding:8px 0;border-top:1px solid var(--line,#ddd)';
+    const sh = el('div', 'srow'); sh.append(el('span', '', '📷 スクショの保存先'), btn('変更', () => window.menu.act('set-shotdir', null, true)), btn('開く', () => window.menu.act('set-shotdir-open', null, true)));
+    const sp = el('div', 'hint', data.shotDir || ('標準: ' + (data.shotDirDef || ''))); sp.style.cssText = 'word-break:break-all;font-size:12px;line-height:1.5;padding:2px 2px 0';
+    sd.append(sh, sp);
+    if (data.shotDir) { const rs = el('button', 'lnk', '標準の場所に戻す'); rs.type = 'button'; rs.style.cssText = 'margin:2px 2px 0;font-size:12px'; rs.addEventListener('click', () => window.menu.act('set-shotdir-reset', null, true)); sd.appendChild(rs); }
+    root.appendChild(sd);
     const au = el('div', 'srow'), st = el('span', data.loggedIn ? 'ok' : '', data.loggedIn ? 'ログイン中' + (data.loginVia ? ' (' + data.loginVia + ')' : '') : '未ログイン');
     au.append(st, btn(data.loggedIn ? 'ログアウト' : 'ニコニコにログイン', () => window.menu.act('set-auth', null, true))); root.appendChild(au);
     if (!data.loggedIn) {
@@ -214,7 +223,13 @@ body.sugmode #root{padding:0}
       const up = el('div', 'srow upd'); up.append(el('span', '', `🔔 新しいバージョン v${data.update.latest} があります`), data.update.auto ? btn('更新して再起動', () => window.menu.act('set-update-apply', null, true)) : btn('ダウンロードページを開く', () => window.menu.act('set-update', null, true)));
       root.appendChild(up);
     }
-    if (data.appVersion) root.appendChild(el('div', 'ver', 'ニコ生マルチビュー v' + data.appVersion));
+    if (data.appVersion) {
+      const vb = el('button', 'ver', 'ニコ生マルチビュー v' + data.appVersion + ' ⓘ'); vb.type = 'button';
+      vb.style.cssText = 'display:block;width:100%;background:none;border:0;cursor:pointer;font:inherit;text-decoration:underline dotted';
+      vb.title = 'バージョン情報: クリックで、Electron などのバージョンを表示します'; vb.style.whiteSpace = 'nowrap';
+      vb.addEventListener('click', () => window.menu.act('set-about', null, true));
+      root.appendChild(vb);
+    }
     report();
   }
 

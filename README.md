@@ -9,7 +9,7 @@
 
 ## ダウンロード
 
-[最新版をダウンロード(Windows 10 / 11 64bit)](https://github.com/kako774/nico-multiview/releases/download/v1.1.1/NicoMultiView-win-1.1.1.zip)
+[最新版をダウンロード(Windows 10 / 11 64bit)](https://github.com/kako774/nico-multiview/releases/download/v1.1.2/NicoMultiView-win-1.1.2.zip)
 
 過去のバージョンは [Releases](https://github.com/kako774/nico-multiview/releases) にあります。
 
@@ -20,7 +20,7 @@
 - 映像をダブルクリックで、その枠だけの表示に切り替え(もう一度ダブルクリックか Esc で元の表示に戻る)
 - 全画面表示(F11 / 「全画面」ボタン。バーを隠して枠だけを全画面で表示。Esc で戻る)
 - コメントの投稿と、枠ごとの表示切替
-- 全枠のコメントをまとめて見られる統合コメントビューア(別窓。位置と大きさは次回も保持)
+- 全枠のコメントをまとめて見られる統合コメビュ(別窓。位置と大きさは次回も保持)
 - 放送者名の検索、lv番号・URLの貼り付け、ブラウザからのリンクのドラッグ&ドロップで枠を追加
 - ギフトイベントの上位者を順位順に自動表示(1〜3位は金・銀・銅、召喚獣の数も表示)
 - タイムシフトの巻き戻し(⏪ / LIVE ボタン。ニコ生プレミアム会員向け)

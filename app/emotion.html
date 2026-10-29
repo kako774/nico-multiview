@@ -1,0 +1,21 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>エモーション</title><style>
+html,body{margin:0;height:52px;overflow:hidden;background:#1a2132;color:#e8ecf4;font:13px 'Yu Gothic UI','Meiryo',sans-serif}
+.bar{height:52px;display:flex;align-items:center;gap:8px;padding:0 12px;box-sizing:border-box}
+.ttl{font-weight:700;color:#ffb347;white-space:nowrap}
+select{flex:1;min-width:0;background:#2a3550;color:#e8ecf4;border:1px solid #3a4870;border-radius:6px;padding:6px 8px;font:inherit}
+button{background:#e8a246;color:#1a2132;border:0;border-radius:6px;padding:6px 12px;font:inherit;font-weight:700;cursor:pointer;white-space:nowrap}
+</style></head><body><div class="bar"><span class="ttl">😀 エモーション先</span><select id="sel"></select><button id="re" title="エモーションのページを読み込み直す">↻ 再読込</button></div>
+<script>
+const sel=document.getElementById('sel');
+emo.onState((list,cur)=>{
+  sel.textContent='';
+  const o=document.createElement('option');o.value='';o.textContent=list.length?'枠を選んでください':'枠がありません';sel.append(o);
+  list.forEach(t=>{const e=document.createElement('option');e.value=t.id;e.textContent=t.name;sel.append(e);});
+  sel.value=cur||'';
+});
+sel.addEventListener('change',()=>emo.pick(sel.value));
+document.getElementById('re').addEventListener('click',()=>emo.reopen());
+emo.ready();
+</script></body></html>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
-<title>統合コメントビューア</title>
+<title>コメビュ</title>
 <style>
 :root{
   --bg:#0f1115;--panel:#181b22;--line:#2a2f3a;--text:#e8eaf0;--sub:#9aa3b2;--accent:#4da3ff;--danger:#ff6b6b;--ok:#5fd38d;
@@ -61,7 +61,10 @@ input[type=text]:focus{outline:2px solid var(--accent)}
   .no{text-align:left}
 }
 @media (max-width:420px){ .no{display:none} .line{grid-template-columns:auto 10px minmax(0,1fr) minmax(0,9em)} }
-/* 設定「コメントビューアに放送者名を表示」をOFFにしたとき */
+/* 設定「コメビュに放送者名を表示」をOFFにしたとき */
+/* 設定「コメビュをコメントだけにする」をONにしたとき: コメントの文字以外は、すべて消す */
+body.simple #bar,body.simple #chips,body.simple .no,body.simple .t,body.simple .d,body.simple .n,body.simple .s{display:none!important}
+body.simple .line{display:block!important;padding:4px 12px!important}
 body.nosrc .s{display:none}
 body.nosrc .line{grid-template-columns:3.6em 4.4em 10px 9.5em 1fr}
 @media (max-width:680px){ body.nosrc .line{grid-template-columns:auto auto 10px minmax(0,1fr)} }
@@ -85,6 +88,39 @@ body.nosrc .line{grid-template-columns:3.6em 4.4em 10px 9.5em 1fr}
 .box .note{padding:6px 14px;font-size:12px;color:var(--sub)}
 #latest{position:absolute;right:14px;bottom:14px;display:none;background:var(--accent);border-color:var(--accent);color:var(--onaccent);font-weight:700;padding:5px 12px;border-radius:999px}
 #wrap{position:relative;flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+/* ガラステーマ3種: B=Windows 11風(ダーク) / C=明るいフロスト / F=スモーク。Windows 11 では窓の背景もすりガラスになる */
+/* B  Windows 11 風(Acrylic/Mica・ダーク) */
+:root[data-theme="glassb"]{--bg:transparent;--panel:rgba(32,34,46,.55);--line:rgba(255,255,255,.12);--text:#f3f4f8;--sub:#aab0c4;--accent:#7fb2ff;--input:rgba(0,0,0,.28);
+--btn:rgba(255,255,255,.08);--btnhv:#7fb2ff;--onaccent:#08142b;--tilebg:rgba(255,255,255,.04);--stagebg:transparent;--tagbg:rgba(0,0,0,.45);--hl:rgba(127,178,255,.3);color-scheme:dark}
+:root[data-theme="glassb"] #bar,:root[data-theme="glassb"] .head,:root[data-theme="glassb"] .foot{backdrop-filter:blur(30px) saturate(1.6)}
+:root[data-theme="glassb"] button,:root[data-theme="glassb"] select{border-color:rgba(255,255,255,.14)!important;border-radius:6px!important}
+:root[data-theme="glassb"] .tile{border-color:rgba(255,255,255,.1);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.35)}
+:root[data-theme="glassb"]:not(.acrylic){background:radial-gradient(700px 420px at 15% 15%,#5b3fd0 0,transparent 60%),radial-gradient(700px 500px at 90% 20%,#1e88e5 0,transparent 60%),radial-gradient(700px 400px at 50% 110%,#e0457b 0,transparent 60%),linear-gradient(160deg,#10142a,#1b2145)}
+/* C  macOS風(明るいフロスト) */
+:root[data-theme="glassc"]{--bg:transparent;--panel:rgba(255,255,255,.55);--line:rgba(0,0,0,.1);--text:#1c1f26;--sub:#5d6475;--accent:#0a84ff;--input:rgba(255,255,255,.7);
+--btn:rgba(255,255,255,.75);--btnhv:#0a84ff;--onaccent:#fff;--tilebg:rgba(255,255,255,.35);--stagebg:transparent;--tagbg:rgba(255,255,255,.75);--hl:rgba(10,132,255,.2);color-scheme:light}
+:root[data-theme="glassc"] #bar,:root[data-theme="glassc"] .head,:root[data-theme="glassc"] .foot{backdrop-filter:blur(28px) saturate(1.8)}
+:root[data-theme="glassc"] button,:root[data-theme="glassc"] select{border-radius:8px!important;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+:root[data-theme="glassc"] .tile{border-radius:12px;border-color:rgba(255,255,255,.8);box-shadow:0 6px 20px rgba(60,70,100,.18)}
+:root[data-theme="glassc"]:not(.acrylic){background:radial-gradient(700px 420px at 15% 10%,#ffd1a6 0,transparent 60%),radial-gradient(700px 500px at 90% 20%,#a6c8ff 0,transparent 60%),radial-gradient(700px 400px at 50% 110%,#c8f0d0 0,transparent 60%),linear-gradient(160deg,#e9edf6,#f6e9ef)}
+/* F  スモークガラス(黒く落ち着いた半透明) */
+:root[data-theme="glassf"]{--bg:transparent;--panel:rgba(8,8,12,.62);--line:rgba(255,255,255,.1);--text:#ececf2;--sub:#9a9cab;--accent:#8ab4ff;--input:rgba(255,255,255,.07);
+--btn:rgba(255,255,255,.06);--btnhv:#8ab4ff;--onaccent:#071228;--tilebg:rgba(0,0,0,.25);--stagebg:transparent;--tagbg:rgba(0,0,0,.6);--hl:rgba(138,180,255,.25);color-scheme:dark}
+:root[data-theme="glassf"] #bar,:root[data-theme="glassf"] .head,:root[data-theme="glassf"] .foot{backdrop-filter:blur(8px)}
+:root[data-theme="glassf"] button,:root[data-theme="glassf"] select{border-color:rgba(255,255,255,.1)!important}
+:root[data-theme="glassf"] .tile{border-color:rgba(255,255,255,.08)}
+:root[data-theme="glassf"]:not(.acrylic){background:radial-gradient(700px 420px at 15% 15%,#5b3fd0 0,transparent 60%),radial-gradient(700px 500px at 90% 20%,#1e88e5 0,transparent 60%),radial-gradient(700px 400px at 50% 110%,#e0457b 0,transparent 60%),linear-gradient(160deg,#10142a,#1b2145)}
+
+:root[data-theme^="glass"] #chips,:root[data-theme^="glass"] .chip{backdrop-filter:blur(8px)}
+:root[data-theme="glassb"]{--chip:rgba(255,255,255,.1);--c0:#6db4ff}
+:root[data-theme="glassf"]{--chip:rgba(255,255,255,.08)}
+:root[data-theme="glassc"]{--chip:rgba(255,255,255,.75)}
+:root[data-theme="glassb"] body,:root[data-theme="glassf"] body{color-scheme:dark}
+
+/* 選択肢の一覧は、背景が透けないよう、はっきりした色にする */
+:root[data-theme="glassb"] option{background:#232638;color:#f3f4f8}
+:root[data-theme="glassf"] option{background:#14141b;color:#ececf2}
+:root[data-theme="glassc"] option{background:#ffffff;color:#1c1f26}
 </style>
 </head>
 <body>
@@ -273,6 +309,15 @@ body.nosrc .line{grid-template-columns:3.6em 4.4em 10px 9.5em 1fr}
     selU = line._it.u; restyle();
     openMenu(line._it, tg);
   });
+  // シンプル表示(コメントだけ)のときは、コメントの行を右クリックして、同じメニュー(コピー・色・履歴・NG)を出す
+  list.addEventListener('contextmenu', e => {
+    if (!document.body.classList.contains('simple')) return;
+    const line = e.target.closest && e.target.closest('.line'); if (!line || !line._it) return;
+    e.preventDefault(); e.stopPropagation(); closeMenu();
+    selU = line._it.u || ''; restyle();
+    const a = document.createElement('span'); a.style.cssText = `position:fixed;left:${e.clientX}px;top:${e.clientY}px;width:0;height:0`; document.body.appendChild(a);
+    openMenu(line._it, a); a.remove();
+  });
   list.addEventListener('dblclick', e => {
     const line = e.target.closest && e.target.closest('.line'); if (!line || !line._it || !line._it.u) return;
     e.preventDefault(); e.stopPropagation(); closeMenu();
@@ -315,11 +360,14 @@ body.nosrc .line{grid-template-columns:3.6em 4.4em 10px 9.5em 1fr}
     el.append(lamp, document.createTextNode('接続中'));
   };
   window.vw.onMode(showMode);
-  window.vw.onOpt(o => document.body.classList.toggle('nosrc', !!(o && o.hideSrc)));
+  window.vw.onOpt(o => { document.body.classList.toggle('nosrc', !!(o && o.hideSrc)); document.body.classList.toggle('simple', !!(o && o.simple)); });
   window.vw.onComments(items => add(items));
-  window.vw.init().then(({ backlog, sources, modes, opt }) => {
+  const setTheme = (t, ok) => { document.documentElement.dataset.theme = t || ''; document.documentElement.classList.toggle('acrylic', !!ok); };
+  window.vw.onTheme(setTheme);
+  window.vw.init().then(({ backlog, sources, modes, opt, theme, acrylic }) => {
+    setTheme(theme, acrylic);
     showMode(modes);
-    document.body.classList.toggle('nosrc', !!(opt && opt.hideSrc));
+    document.body.classList.toggle('nosrc', !!(opt && opt.hideSrc)); document.body.classList.toggle('simple', !!(opt && opt.simple));
     (sources || []).forEach(s => { names.set(s.id, s.name); color(s.id); });
     openIds = new Set((sources || []).map(s => s.id));
     renderChips(); add(backlog || []); list.scrollTop = list.scrollHeight; showLatest();

@@ -26,7 +26,6 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
   font-family:"Noto Sans JP","Yu Gothic UI","Meiryo","Hiragino Sans",sans-serif;font-size:14px}
 body{display:flex;flex-direction:column;overflow:hidden;user-select:none}
 #bar{flex:0 0 auto;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line)}
-#bar h1{font-size:15px;margin:0 6px 0 0;white-space:nowrap}
 #addForm{position:relative;display:flex;gap:6px;flex:1 1 200px;min-width:150px;max-width:420px}
 input[type=text]{min-width:0;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--input);color:var(--text);font:inherit;user-select:text}
 input[type=text]:focus{outline:2px solid var(--accent)}
@@ -40,7 +39,6 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--o
 .chk{display:flex;align-items:center;gap:5px;color:var(--sub);cursor:pointer;white-space:nowrap}
 #setBtn{margin-left:auto}
 /* ヘッダーが2行にならないよう、狭いときは順に省略する */
-@media (max-width:1760px){#bar h1{display:none}}
 @media (max-width:1420px){#bar .t{display:none}}
 @media (max-width:1180px){#bar .chk span.lb{display:none}}
 #setPanel{display:none}
@@ -65,6 +63,7 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--o
 .sm{display:inline-flex;gap:3px;margin-left:5px;vertical-align:middle}
 .sm i{font-style:normal;font-size:10px;font-weight:800;padding:0 3px;border-radius:5px;color:#fff}
 .sm{margin-left:3px;gap:2px}
+body.nosm .sm{display:none!important}
 .head button.live{font-weight:800;font-size:13px;letter-spacing:.03em;color:#fff;background:#d93025;border-color:#d93025}
 .head button.live:hover{filter:brightness(1.1)}
 .tile.rkd .tag{flex:0 1 auto;min-width:8em}.tile.rkd .tag .tt{min-width:2em}
@@ -131,11 +130,38 @@ body.showCmt .foot{display:flex}
 #empty.show{display:grid}
 #empty b{color:var(--text);font-size:17px}
 #empty code{background:var(--btn);padding:1px 6px;border-radius:4px}
+
+/* ガラステーマ3種: B=Windows 11風(ダーク) / C=明るいフロスト / F=スモーク。Windows 11 では窓の背景もすりガラスになる */
+/* B  Windows 11 風(Acrylic/Mica・ダーク) */
+:root[data-theme="glassb"]{--bg:transparent;--panel:rgba(32,34,46,.55);--line:rgba(255,255,255,.12);--text:#f3f4f8;--sub:#aab0c4;--accent:#7fb2ff;--input:rgba(0,0,0,.28);
+--btn:rgba(255,255,255,.08);--btnhv:#7fb2ff;--onaccent:#08142b;--tilebg:rgba(255,255,255,.04);--stagebg:transparent;--tagbg:rgba(0,0,0,.45);--hl:rgba(127,178,255,.3);color-scheme:dark}
+:root[data-theme="glassb"] #bar,:root[data-theme="glassb"] .head,:root[data-theme="glassb"] .foot{backdrop-filter:blur(30px) saturate(1.6)}
+:root[data-theme="glassb"] button,:root[data-theme="glassb"] select{border-color:rgba(255,255,255,.14)!important;border-radius:6px!important}
+:root[data-theme="glassb"] .tile{border-color:rgba(255,255,255,.1);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.35)}
+:root[data-theme="glassb"]:not(.acrylic){background:radial-gradient(700px 420px at 15% 15%,#5b3fd0 0,transparent 60%),radial-gradient(700px 500px at 90% 20%,#1e88e5 0,transparent 60%),radial-gradient(700px 400px at 50% 110%,#e0457b 0,transparent 60%),linear-gradient(160deg,#10142a,#1b2145)}
+/* C  macOS風(明るいフロスト) */
+:root[data-theme="glassc"]{--bg:transparent;--panel:rgba(255,255,255,.55);--line:rgba(0,0,0,.1);--text:#1c1f26;--sub:#5d6475;--accent:#0a84ff;--input:rgba(255,255,255,.7);
+--btn:rgba(255,255,255,.75);--btnhv:#0a84ff;--onaccent:#fff;--tilebg:rgba(255,255,255,.35);--stagebg:transparent;--tagbg:rgba(255,255,255,.75);--hl:rgba(10,132,255,.2);color-scheme:light}
+:root[data-theme="glassc"] #bar,:root[data-theme="glassc"] .head,:root[data-theme="glassc"] .foot{backdrop-filter:blur(28px) saturate(1.8)}
+:root[data-theme="glassc"] button,:root[data-theme="glassc"] select{border-radius:8px!important;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+:root[data-theme="glassc"] .tile{border-radius:12px;border-color:rgba(255,255,255,.8);box-shadow:0 6px 20px rgba(60,70,100,.18)}
+:root[data-theme="glassc"]:not(.acrylic){background:radial-gradient(700px 420px at 15% 10%,#ffd1a6 0,transparent 60%),radial-gradient(700px 500px at 90% 20%,#a6c8ff 0,transparent 60%),radial-gradient(700px 400px at 50% 110%,#c8f0d0 0,transparent 60%),linear-gradient(160deg,#e9edf6,#f6e9ef)}
+/* F  スモークガラス(黒く落ち着いた半透明) */
+:root[data-theme="glassf"]{--bg:transparent;--panel:rgba(8,8,12,.62);--line:rgba(255,255,255,.1);--text:#ececf2;--sub:#9a9cab;--accent:#8ab4ff;--input:rgba(255,255,255,.07);
+--btn:rgba(255,255,255,.06);--btnhv:#8ab4ff;--onaccent:#071228;--tilebg:rgba(0,0,0,.25);--stagebg:transparent;--tagbg:rgba(0,0,0,.6);--hl:rgba(138,180,255,.25);color-scheme:dark}
+:root[data-theme="glassf"] #bar,:root[data-theme="glassf"] .head,:root[data-theme="glassf"] .foot{backdrop-filter:blur(8px)}
+:root[data-theme="glassf"] button,:root[data-theme="glassf"] select{border-color:rgba(255,255,255,.1)!important}
+:root[data-theme="glassf"] .tile{border-color:rgba(255,255,255,.08)}
+:root[data-theme="glassf"]:not(.acrylic){background:radial-gradient(700px 420px at 15% 15%,#5b3fd0 0,transparent 60%),radial-gradient(700px 500px at 90% 20%,#1e88e5 0,transparent 60%),radial-gradient(700px 400px at 50% 110%,#e0457b 0,transparent 60%),linear-gradient(160deg,#10142a,#1b2145)}
+
+/* 選択肢の一覧は、背景が透けないよう、はっきりした色にする */
+:root[data-theme="glassb"] option{background:#232638;color:#f3f4f8}
+:root[data-theme="glassf"] option{background:#14141b;color:#ececf2}
+:root[data-theme="glassc"] option{background:#ffffff;color:#1c1f26}
 </style>
 </head>
 <body class="showCmt">
 <div id="bar">
-  <h1>ニコ生マルチビュー</h1>
   <form id="addForm" autocomplete="off">
     <input id="addInput" type="text" placeholder="放送者名で検索 / lv番号 / 放送URL(複数まとめて貼付OK)" aria-label="放送を追加">
     <button class="primary" type="submit">追加</button>
@@ -155,7 +181,7 @@ body.showCmt .foot{display:flex}
   <button id="flBtn" type="button" title="フォロー中で、いま放送中の番組を一覧から開く">👥<span class="t"> フォロー中</span></button>
   <button id="evBtn" type="button" title="ギフトイベントの上位者の放送を自動で並べる">🎁<span class="t"> ギフトイベント</span></button>
   <div id="evChip"><span id="evChipT"></span><button id="evStop" type="button" title="追跡をやめる(枠はそのまま残ります)">✕</button></div>
-  <button id="viewerBtn" type="button" title="全枠のコメントをまとめて表示する別窓を開く">コメントビューア</button>
+  <button id="viewerBtn" type="button" title="全枠のコメントをまとめて表示する別窓を開く">コメビュ</button>
   <button id="clearBtn" type="button">全部閉じる</button>
   <button id="setBtn" type="button" title="テーマ・プレイヤーのみ・ログイン">⚙<span class="t"> 設定</span></button>
   <div id="msg" role="status"></div>
@@ -163,7 +189,7 @@ body.showCmt .foot{display:flex}
 <div id="setPanel" hidden>
   <div class="srow"><label for="theme">テーマ</label>
     <select id="theme" aria-label="テーマ" title="画面の明るさ">
-      <option value="system">自動</option><option value="light">ライト</option><option value="dark">ダーク</option>
+      <option value="system">自動</option><option value="light">ライト</option><option value="dark">ダーク</option><option value="glassb">ガラス(Windows 11風)</option><option value="glassc">ガラス(明るい)</option><option value="glassf">ガラス(スモーク)</option>
     </select></div>
   <div class="srow"><label for="playerOnly">プレイヤーのみ</label>
     <input id="playerOnly" type="checkbox" checked title="OFFにすると視聴ページ全体を表示します"></div>
@@ -191,7 +217,7 @@ body.showCmt .foot{display:flex}
   const $ = s => document.querySelector(s);
   const stage = $('#stage'), emptyEl = $('#empty'), msg = $('#msg'), layoutSel = $('#layout');
   let items = [], layout = 'auto', audioIds = [];   // 音声ONの枠(複数可)
-  let playerOnly = true, showCmt = true, use184 = false, loggedIn = false, loginVia = '', audioOnAdd = true, hideSrcName = false, alwaysTop = false, evAudioAll = false, shotDir = '', singleOpen = false;
+  let playerOnly = true, showCmt = true, use184 = false, loggedIn = false, loginVia = '', audioOnAdd = true, hideSrcName = false, viewerSimple = false, alwaysTop = false, evAudioAll = false, shotDir = '', singleOpen = false, seekOn = true, showSm = true;
   let theme = 'system';
   let hideCmts = {};   // 枠ごとの「流れるコメントを隠す」
   let volumes = {}, lastVol = 0.5;   // 枠ごとの音量(0〜1)と、最後に動かした音量(新しい枠の初期値)
@@ -203,16 +229,15 @@ body.showCmt .foot{display:flex}
   const infos = new Map();   // lv番号 -> { name: 放送者名, title: 番組名 }
 
   const parseIds = t => [...new Set((String(t || '').match(/lv\d+/gi) || []).map(s => s.toLowerCase()))];
-  const persist = () => window.mv.save({ items, layout, audioIds, playerOnly, showCmt, use184, audioOnAdd, evAudioAll, singleOpen, shotDir, hideSrcName, alwaysTop, volumes, lastVol, hideCmts, theme, evTrack, evKeys, presets });
+  const persist = () => window.mv.save({ items, layout, audioIds, playerOnly, showCmt, use184, audioOnAdd, evAudioAll, singleOpen, seekOn, showSm, shotDir, hideSrcName, viewerSimple, alwaysTop, volumes, lastVol, hideCmts, theme, evTrack, evKeys, presets });
   // 表示名: 放送者名(取得できるまではlv番号)
   const shotDirDef = '(ピクチャ\\ニコ生マルチビュー)';
   const nameOf = id => (infos.get(id) && infos.get(id).name) || id;
 
   let msgTimer;
   function say(text, err) {
-    msg.textContent = text; msg.className = 'show' + (err ? ' err' : '');
-    clearTimeout(msgTimer); msgTimer = setTimeout(() => { msg.className = ''; layoutNow(); }, err ? 10000 : 7000);
-    layoutNow();
+    // 画面の下にポップアップで出す(上のバーに出すと、枠の大きさが変わってしまうため)
+    window.mv.toast(text, err);
   }
 
   /* ---------- ログイン表示 ---------- */
@@ -317,7 +342,7 @@ body.showCmt .foot{display:flex}
     sendDock();
     window.mv.giftTargets(items.map(id => ({ id, name: nameOf(id) })));
   }
-  // 合体したコメントビューアを置く場所(右側)を、メインプロセスへ伝える
+  // 合体したコメビュを置く場所(右側)を、メインプロセスへ伝える
   const dockEl = $('#dock'), splitEl = $('#split');
   let dockOn = false, dockW = 420;
   function sendDock() {
@@ -338,6 +363,32 @@ body.showCmt .foot{display:flex}
     const up = () => { splitEl.classList.remove('drag'); splitEl.removeEventListener('pointermove', mv); splitEl.removeEventListener('pointerup', up); splitEl.removeEventListener('pointercancel', up); window.mv.dockWidth(dockW); };
     splitEl.addEventListener('pointermove', mv); splitEl.addEventListener('pointerup', up); splitEl.addEventListener('pointercancel', up);
   });
+  // 1つの枠(拡大中ならその枠、なければ最初の枠)の映像エリアが tw×th になるよう、窓の大きさを合わせる
+  let fitting = false;
+  async function fitVideo(tw, th) {
+    if (fitting) return; fitting = true;
+    try {
+      if (!items.length) { say('枠がありません。放送を追加してから実行してください'); return; }
+      const id = focusId && items.includes(focusId) ? focusId : items[0];
+      let clamped = false, r = null;
+      for (let i = 0; i < 4; i++) {
+        const t = [...stage.children].find(x => x.dataset.id === id);
+        r = t && t.querySelector('.content').getBoundingClientRect();
+        if (!r || !r.width || !r.height) break;
+        const dw = tw - r.width, dh = th - r.height;
+        if (Math.abs(dw) < 1 && Math.abs(dh) < 1) break;
+        // 枠が複数あるときは、窓全体の変化量が枠1つ分より大きくなる分を補正する
+        const res = await window.mv.resizeBy(dw * (stage.clientWidth / r.width), dh * (stage.clientHeight / r.height));
+        if (!res || !res.ok) { say(res && res.why === 'fullscreen' ? '全画面を解除してから実行してください' : '窓の大きさを変えられませんでした'); return; }
+        clamped = !!res.clamped;
+        applyGrid(); await new Promise(f => setTimeout(f, 250));
+      }
+      const t = [...stage.children].find(x => x.dataset.id === id);
+      r = t && t.querySelector('.content').getBoundingClientRect();
+      if (r && Math.abs(r.width - tw) < 1.5 && Math.abs(r.height - th) < 1.5) say(`映像を ${tw}×${th} に合わせました`);
+      else say(`映像は ${r ? Math.round(r.width) : '?'}×${r ? Math.round(r.height) : '?'} になりました` + (clamped ? '(画面に収まらないため、これ以上は広げられません)' : ''));
+    } finally { fitting = false; layoutNow(); }
+  }
   let raf = 0;
   function layoutNow() { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { applyGrid(); sendRects(); }); }
 
@@ -361,6 +412,8 @@ body.showCmt .foot{display:flex}
     const head = document.createElement('div'); head.className = 'head';
     head.addEventListener('dblclick', e => { if (!e.target.closest('button, input')) toggleFocus(id); });
     const tag = document.createElement('span'); tag.className = 'tag';
+    tag.title = '右クリック: 放送の詳細 / 放送のURLをコピー / 放送者のページ';
+    tag.addEventListener('contextmenu', e => { e.preventDefault(); fmTarget = id; openMenu('fm', tag); });
     const vol = document.createElement('input'); vol.type = 'range'; vol.className = 'vol'; vol.min = 0; vol.max = 100; vol.step = 1;
     const volv = document.createElement('span'); volv.className = 'volv';
     const shown = () => Math.round((typeof volumes[id] === 'number' ? volumes[id] : lastVol) * 100);
@@ -383,17 +436,18 @@ body.showCmt .foot{display:flex}
     const lv = mk('LIVE', '現在のライブに戻る', () => window.mv.player(id, 'live'), 'live');
     head.append(tag, grow, vol, volv, rw, lv, snd, cm,
       mk('🎁', 'この枠にギフトを贈る(ギフトウィンドウが開きます)', () => window.mv.giftOpen(id), 'giftbtn'),
+      (() => { const b = mk('', 'この枠のエモーションを開く(別窓)', () => window.mv.emotion(id), 'emo'); b.style.fontSize = '0'; b.innerHTML = '&#8203;<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.2c.9 1.3 2.1 2 3.5 2s2.6-.7 3.5-2"/><circle cx="9" cy="9.8" r=".6" fill="currentColor"/><circle cx="15" cy="9.8" r=".6" fill="currentColor"/></svg>'; return b; })(),
       mk('★', 'メインにする(この枠を先頭・大きい枠へ)', () => {
         items = [id, ...items.filter(x => x !== id)]; if (layout === 'auto') layout = 'main'; render();
       }),
-      (() => { const b = mk('📷', 'この枠の映像(流れるコメントを含む)を撮る: クリップボードにコピーして、保存もします', async () => {
-        const r = await window.mv.shot(id, nameOf(id) || '', shotDir).catch(e => ({ ok: false, error: '撮影に失敗しました(呼び出し: ' + String(e && e.message || e).slice(0, 60) + ')' }));
+      (() => { const run = async (noCmt) => {
+        const r = await window.mv.shot(id, nameOf(id) || '', shotDir, noCmt).catch(e => ({ ok: false, error: '撮影に失敗しました(呼び出し: ' + String(e && e.message || e).slice(0, 60) + ')' }));
         if (!(r && r.ok)) { say((r && r.error) || '撮影に失敗しました', true); return; }
         if (r.png) {   // 本体側でコピーできなかったときは、ここでクリップボードにコピーする
           try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': new Blob([r.png], { type: 'image/png' }) })]); window.mv.log && window.mv.log('INFO', 'スクリーンショットをクリップボードにコピーしました'); }
           catch (e) { say('クリップボードにコピーできませんでした(ファイルには保存しました)', true); window.mv.log && window.mv.log('WARN', 'スクショのコピーに失敗(画面側): ' + String(e && e.message || e).slice(0, 80)); }
         }   // 成功のときは、メッセージを出さない(ログに残す)
-      }, 'shot'); b.innerHTML = '&#8203;<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.6-2.4h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.2" r="3.6"/></svg>'; return b; })(),
+      }; const b = mk('📷', 'この枠の映像(流れるコメントを含む)を撮る: クリップボードにコピーして、保存もします\n右クリック: コメントなしで撮る', () => run(false), 'shot'); b.addEventListener('contextmenu', e => { e.preventDefault(); run(true); }); b.innerHTML = '&#8203;<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.6-2.4h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.2" r="3.6"/></svg>'; return b; })(),
       mk('↻', '再読込(この枠だけ読み込み直す)', () => window.mv.reload(id)),
       mk('↗', 'ブラウザで開く(既定のブラウザ)', () => window.mv.external(id)),
       mk('✕', 'この枠を閉じる', () => { items = items.filter(x => x !== id); audioIds = audioIds.filter(x => x !== id); render(); }, 'close'));
@@ -570,7 +624,8 @@ body.showCmt .foot{display:flex}
   setBtn.addEventListener('click', () => openMenu('set', setBtn));
   window.mv.version().then(v => { appVersion = v; }).catch(() => {});
   const themeSel = $('#theme');
-  themeSel.addEventListener('change', () => { theme = themeSel.value; window.mv.setTheme(theme); persist(); });
+  themeSel.addEventListener('change', () => { theme = themeSel.value; document.documentElement.dataset.theme = theme; window.mv.setTheme(theme); persist(); });
+  window.mv.onGlass(ok => document.documentElement.classList.toggle('acrylic', ok));
   $('#viewerBtn').addEventListener('click', () => window.mv.openViewer());
   $('#clearBtn').addEventListener('click', () => { if (!items.length) return; if (!confirm(`開いている ${items.length} 枠をすべて閉じますか?`)) return; items = []; audioIds = []; render(); });
   $('#authBtn').addEventListener('click', () => {
@@ -640,8 +695,9 @@ body.showCmt .foot{display:flex}
   // メニュー(映像と同じネイティブのビューで、いちばん手前に出る)
   function menuData() {
     const names = {}; presets.forEach(p => p.items.forEach(id => { names[id] = nameOf(id); })); items.forEach(id => { names[id] = nameOf(id); });
-    return { theme, playerOnly, audioOnAdd, evAudioAll, singleOpen, shotDir, shotDirDef: shotDirDef, hideSrcName, alwaysTop, loggedIn, loginVia, appVersion, update: updateInfo, presets, names, evKeys, evTrack, evN, items: items.slice(), dlgCount: items.length, dlgNames: items.map(nameOf) };
+    return { fmId: fmTarget, fmName: nameOf(fmTarget), theme, playerOnly, audioOnAdd, evAudioAll, singleOpen, seekOn, showSm, shotDir, shotDirDef: shotDirDef, hideSrcName, viewerSimple, alwaysTop, loggedIn, loginVia, appVersion, update: updateInfo, presets, names, evKeys, evTrack, evN, items: items.slice(), dlgCount: items.length, dlgNames: items.map(nameOf) };
   }
+  let fmTarget = '';
   function openMenu(type, btn) {
     const r = btn.getBoundingClientRect();
     if (type === 'set') {   // 設定は、ボタンの右端にそろえて開く
@@ -658,11 +714,19 @@ body.showCmt .foot{display:flex}
   window.mv.onMenuClosed(t => { if (menuType === t) menuType = ''; if (t === 'sug') sgOpen = false; });
   window.mv.onMenuAct((action, p) => {
     if (action === 'set-theme') { themeSel.value = String(p); themeSel.dispatchEvent(new Event('change')); window.mv.menuData(menuData()); return; }
+    if (action === 'fm-detail' || action === 'fm-url' || action === 'fm-user') {
+      window.mv.frameAct(action.slice(3), String(p)).then(r => { if (r && r.ok === false && r.error) say(r.error, true); });
+      return;
+    }
+    if (action === 'set-fit720') { fitVideo(1280, 720); return; }
     if (action === 'set-top') { alwaysTop = !!p; window.mv.alwaysTop(alwaysTop); persist(); window.mv.menuData(menuData()); return; }
-    if (action === 'set-hsn') { hideSrcName = !p; window.mv.viewerOpt({ hideSrc: hideSrcName }); persist(); window.mv.menuData(menuData()); return; }
+    if (action === 'set-vsimple') { viewerSimple = !!p; window.mv.viewerOpt({ hideSrc: hideSrcName, simple: viewerSimple }); persist(); window.mv.menuData(menuData()); return; }
+    if (action === 'set-hsn') { hideSrcName = !p; window.mv.viewerOpt({ hideSrc: hideSrcName, simple: viewerSimple }); persist(); window.mv.menuData(menuData()); return; }
     if (action === 'set-shotdir') { window.mv.pickShotDir(shotDir).then(r => { if (r && r.dir) { shotDir = r.dir; persist(); } window.mv.menuData(menuData()); }); return; }
     if (action === 'set-shotdir-reset') { shotDir = ''; persist(); window.mv.menuData(menuData()); return; }
     if (action === 'set-shotdir-open') { window.mv.openShotDir(shotDir); return; }
+    if (action === 'set-sm') { showSm = !!p; document.body.classList.toggle('nosm', !showSm); persist(); window.mv.menuData(menuData()); return; }
+    if (action === 'set-seek') { seekOn = !!p; window.mv.seek(seekOn); persist(); window.mv.menuData(menuData()); return; }
     if (action === 'set-so') { singleOpen = !!p; persist(); window.mv.menuData(menuData()); return; }
     if (action === 'set-eaa') { evAudioAll = !!p; persist(); window.mv.menuData(menuData()); return; }
     if (action === 'set-aoa') { audioOnAdd = !!p; persist(); window.mv.menuData(menuData()); return; }
@@ -778,17 +842,21 @@ body.showCmt .foot{display:flex}
       if (typeof s.audioOnAdd === 'boolean') audioOnAdd = s.audioOnAdd;
       if (typeof s.evAudioAll === 'boolean') evAudioAll = s.evAudioAll;
       if (typeof s.singleOpen === 'boolean') singleOpen = s.singleOpen;
+      if (typeof s.showSm === 'boolean') { showSm = s.showSm; document.body.classList.toggle('nosm', !showSm); }
+      if (typeof s.seekOn === 'boolean') { seekOn = s.seekOn; window.mv.seek(seekOn); }
       if (typeof s.shotDir === 'string') shotDir = s.shotDir;
       if (typeof s.hideSrcName === 'boolean') hideSrcName = s.hideSrcName;
-      window.mv.viewerOpt({ hideSrc: hideSrcName });
+      if (typeof s.viewerSimple === 'boolean') viewerSimple = s.viewerSimple;
+      window.mv.viewerOpt({ hideSrc: hideSrcName, simple: viewerSimple });
       if (typeof s.alwaysTop === 'boolean') { alwaysTop = s.alwaysTop; window.mv.alwaysTop(alwaysTop); }
-      if (['system', 'light', 'dark'].includes(s.theme)) theme = s.theme;
+      if (['system', 'light', 'dark', 'glassb', 'glassc', 'glassf'].includes(s.theme)) theme = s.theme;
+      if (s.theme === 'glass') theme = 'glassb';
       if (s.volumes && typeof s.volumes === 'object') for (const [k, v] of Object.entries(s.volumes)) if (/^lv\d+$/.test(k) && Number.isFinite(Number(v))) volumes[k] = Math.min(1, Math.max(0, Number(v)));
       if (s.hideCmts && typeof s.hideCmts === 'object') for (const [k, v] of Object.entries(s.hideCmts)) if (/^lv\d+$/.test(k) && v === true) hideCmts[k] = true;
       if (Number.isFinite(Number(s.lastVol))) lastVol = Math.min(1, Math.max(0, Number(s.lastVol)));
       items.forEach(id => { if (typeof volumes[id] !== 'number') volumes[id] = lastVol; });
     }
-    themeSel.value = theme;
+    themeSel.value = theme; document.documentElement.dataset.theme = theme;
     poEl.checked = playerOnly; scEl.checked = showCmt; a184.checked = use184;
     if (s && Array.isArray(s.presets)) presets = s.presets.filter(p => p && typeof p.name === 'string' && Array.isArray(p.items)).map(p => ({ name: p.name.slice(0, 40), items: p.items.filter(x => /^lv\d+$/.test(x)).slice(0, MAX) })).slice(0, 30);
     if (s && Array.isArray(s.evKeys)) evKeys = s.evKeys.filter(k => /^[\w-]{1,80}$/.test(String(k))).slice(0, 20);

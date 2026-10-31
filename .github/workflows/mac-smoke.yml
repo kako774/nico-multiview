@@ -1,0 +1,44 @@
+name: mac-smoke
+# Mac版の起動確認(試験)。 mac-smoke ブランチへのpush、または手動実行で動く。リリースは作らない。
+on:
+  push:
+    branches: [mac-smoke]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: ビルド(arm64)
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: |
+          npx electron-builder --mac dir --arm64
+          APP=$(ls -d dist/mac*/NicoMultiView.app | head -1)
+          codesign --force --deep -s - "$APP"
+          echo "APP=$PWD/$APP" >> "$GITHUB_ENV"
+      - name: 起動して、25秒後に状態を確認する
+        run: |
+          mkdir -p ../smoke
+          "$APP/Contents/MacOS/NicoMultiView" > ../smoke/app.log 2>&1 &
+          PID=$!
+          sleep 25
+          if kill -0 $PID 2>/dev/null; then echo "alive=yes" | tee ../smoke/result.txt; else echo "alive=NO(終了していた)" | tee ../smoke/result.txt; fi
+          screencapture -x ../smoke/screen.png || echo "screencapture failed" >> ../smoke/result.txt
+          ps aux | grep -i nicomultiview | grep -v grep | wc -l | sed 's/^/processes=/' | tee -a ../smoke/result.txt
+          ls ~/Library/Logs/DiagnosticReports 2>/dev/null | grep -i nico >> ../smoke/result.txt || true
+          kill $PID 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke
+          path: smoke/

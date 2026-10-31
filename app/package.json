@@ -1,7 +1,7 @@
 {
   "name": "nico-multiview",
   "productName": "ニコ生マルチビュー",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "description": "ニコニコ生放送を複数枠まとめて同時視聴するデスクトップアプリ",
   "main": "main.js",
   "private": true,

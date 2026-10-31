@@ -199,11 +199,13 @@ body.nosrc .line{grid-template-columns:3.6em 4.4em 10px 9.5em 1fr}
   const tintOf = c => `color-mix(in srgb, ${c} 26%, transparent)`;
   const userColor = u => ucol[u] || `hsl(${hue(u || 'x')},65%,55%)`;
 
+  // タイムシフトのコメントは、再生時刻(放送の何時間何分何秒か)で表示する
+  const tm = it => { if (it.vt == null) return clock(it.t); const v = Math.max(0, Math.floor(it.vt)), h = Math.floor(v / 3600), m = Math.floor(v % 3600 / 60), s = v % 60; return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0'); };
   function makeRow(it) {
     const l = document.createElement('div'); l.className = 'line'; l.dataset.src = it.id; l.dataset.text = (it.nm + ' ' + it.text).toLowerCase(); l.dataset.u = it.u || '';
     const s = document.createElement('span'); s.className = 's'; s.style.color = color(it.id); s.textContent = nameOf(it.id); s.title = nameOf(it.id);
     const no = document.createElement('span'); no.className = 'no'; no.textContent = it.no || '';
-    const t = document.createElement('span'); t.className = 't'; t.textContent = clock(it.t);
+    const t = document.createElement('span'); t.className = 't'; t.textContent = tm(it);
     const d = document.createElement('span'); d.className = 'd'; d.style.background = userColor(it.u);
     const n = document.createElement('span'); n.className = 'n' + (it.nm ? ' nick' : ''); n.textContent = dispName(it); n.title = (it.u && it.u[0] === 'h' ? '匿名(184)の投稿者 ID ' + it.u.slice(1) : n.textContent) + '(押すとメニュー)';
     if (ucol[it.u]) { n.style.color = ucol[it.u]; l.style.setProperty('--tint', tintOf(ucol[it.u])); }
@@ -225,7 +227,18 @@ body.nosrc .line{grid-template-columns:3.6em 4.4em 10px 9.5em 1fr}
       const key = it.no ? it.id + ':' + it.no : '';
       if (key) { if (seenKey.has(key)) continue; seenKey.add(key); }
       if (!colorOf.has(it.id)) newSrc = true;
-      store.push(it); frag.appendChild(makeRow(it));
+      store.push(it);
+      const row = makeRow(it);
+      if (it.vt != null) {
+        // タイムシフトは、再生時刻の順に並べる(あとから届いた早い時刻のコメントは、手前に差し込む)
+        let ref = null, n = 0;
+        for (let r = list.lastElementChild; r && n < 300; r = r.previousElementSibling, n++) {
+          const x = r._it; if (!x || x.id !== it.id || x.vt == null) continue;
+          if (x.vt > it.vt) ref = r; else break;
+        }
+        if (ref) { list.insertBefore(row, ref); continue; }
+      }
+      frag.appendChild(row);
     }
     if (store.length > 6000) store.splice(0, store.length - 6000);
     if (seenKey.size > 12000) { const k = [...seenKey].slice(-6000); seenKey.clear(); k.forEach(x => seenKey.add(x)); }
@@ -283,7 +296,7 @@ body.nosrc .line{grid-template-columns:3.6em 4.4em 10px 9.5em 1fr}
     const n = document.createElement('div'); n.className = 'note'; n.textContent = 'ここで受け取ったコメントの中から表示しています'; bb.appendChild(n);
     list2.forEach(s => {
       const r = document.createElement('div'); r.className = 'hr';
-      const a = document.createElement('span'); a.textContent = clock(s.t) + ' ' + nameOf(s.id).slice(0, 6);
+      const a = document.createElement('span'); a.textContent = tm(s) + ' ' + nameOf(s.id).slice(0, 6);
       const b = document.createElement('span'); b.textContent = s.text; r.append(a, b); bb.appendChild(r);
     });
     bb.scrollTop = bb.scrollHeight;
@@ -349,6 +362,9 @@ body.nosrc .line{grid-template-columns:3.6em 4.4em 10px 9.5em 1fr}
   window.vw.onSources(src => {
     (src || []).forEach(s => { names.set(s.id, s.name); color(s.id); });
     openIds = new Set((src || []).map(s => s.id));
+    // 閉じた枠のコメントは消す
+    for (let i = store.length - 1; i >= 0; i--) if (!openIds.has(store[i].id)) store.splice(i, 1);
+    list.querySelectorAll('.line').forEach(l => { if (!openIds.has(l.dataset.src)) l.remove(); });
     let changed = false; for (const id of [...hidden]) if (!openIds.has(id)) { hidden.delete(id); changed = true; }
     renderChips(); refreshNames(); if (changed) refilter();
   });
@@ -362,6 +378,11 @@ body.nosrc .line{grid-template-columns:3.6em 4.4em 10px 9.5em 1fr}
   window.vw.onMode(showMode);
   window.vw.onOpt(o => { document.body.classList.toggle('nosrc', !!(o && o.hideSrc)); document.body.classList.toggle('simple', !!(o && o.simple)); });
   window.vw.onComments(items => add(items));
+  window.vw.onClearSrc(id => {
+    for (let i = store.length - 1; i >= 0; i--) if (store[i].id === id) store.splice(i, 1);
+    list.querySelectorAll('.line').forEach(l => { if (l.dataset.src === id) l.remove(); });
+    for (const k of [...seenKey]) if (k.startsWith(id + ':')) seenKey.delete(k);
+  });
   const setTheme = (t, ok) => { document.documentElement.dataset.theme = t || ''; document.documentElement.classList.toggle('acrylic', !!ok); };
   window.vw.onTheme(setTheme);
   window.vw.init().then(({ backlog, sources, modes, opt, theme, acrylic }) => {

@@ -963,7 +963,11 @@ const MAX_BUF = 3000;
 const sourcesList = () => [...views.keys()].map(id => ({ id, name: (infos.get(id) && infos.get(id).name) || id }));
 const viewerWC = () => (viewerView && !viewerView.webContents.isDestroyed() ? viewerView.webContents : viewerWin && !viewerWin.isDestroyed() ? viewerWin.webContents : null);
 const pushViewer = (ch, payload) => { const wc = viewerWC(); if (wc) wc.send(ch, payload); };
-function pushSources() { pushViewer('vw:sources', sourcesList()); }
+function pushSources() {
+  const src = sourcesList(), ids = new Set(src.map(s => s.id));
+  for (let i = commentBuf.length - 1; i >= 0; i--) if (!ids.has(commentBuf[i].id)) commentBuf.splice(i, 1);   // 閉じた枠のコメントは消す
+  pushViewer('vw:sources', src);
+}
 // コメビュの位置・大きさは、閉じても次回に引き継ぐ
 const viewerFile = () => path.join(app.getPath('userData'), 'viewer-bounds.json');
 function loadViewerBounds() {
@@ -1177,10 +1181,21 @@ const CSTATE_JS = `(() => {
     }
   } else if (box2) box2.remove();
   document.documentElement.classList.toggle('nmv-nf', kind === 'x');
-  return { ended, premium, priv, nf, off: nf || ended || !!(box && box.disabled) || msgOn, msg: msgOn ? msg.textContent.trim().slice(0, 60) : '' };
+  // ライブの位置にいるか: 再生位置が、取得済みの映像の末尾(=いまの放送)に近いかで見る。調べられないときは「ライブ」とみなす
+  let atLive = !ended, dbg = '';
+  try {
+    const vd = document.querySelector('video');
+    const lb = document.querySelector('[class*="___live-button___"]');
+    if (vd && vd.seekable && vd.seekable.length) {
+      const gap = vd.seekable.end(vd.seekable.length - 1) - vd.currentTime;
+      if (!ended) atLive = gap < 25;
+      dbg = 'gap=' + gap.toFixed(1) + ' btn=' + (lb ? (lb.disabled ? 'dis ' : '') + String(lb.className).slice(0, 80) : 'none');
+    }
+  } catch (e) { /* 無視 */ }
+  return { atLive, dbg, ended, premium, priv, nf, off: nf || ended || !!(box && box.disabled) || msgOn, msg: msgOn ? msg.textContent.trim().slice(0, 60) : '' };
 })()`;
 const noticed = new Set();   // 一般会員の通知を出した枠
-const cstates = new Map();
+const cstates = new Map(), liveSt = new Map();
 setInterval(() => {
   if (!win || win.isDestroyed()) return;
   for (const [id, v] of views) {
@@ -1195,13 +1210,14 @@ setInterval(() => {
       }
       if (s.nf && !noticed.has(id)) { noticed.add(id); appLog(`${id}: 番組が見つかりません(削除された、または視聴できない番組です)`, 'WARN'); }
       if (s.ended && s.priv && !noticed.has(id)) { noticed.add(id); appLog(`${id}: タイムシフト非公開の番組です`, 'WARN'); }
+      if (liveSt.get(id) !== (!!s.atLive) + ':' + !!s.ended) { liveSt.set(id, (!!s.atLive) + ':' + !!s.ended); appLog(`${id}: ライブ判定=${s.atLive} ${s.dbg || ''}`); win.webContents.send('mv:live-state', id, !!s.atLive, !!s.ended); }
       const key = s.off ? why : '';
       if (cstates.get(id) === key) return;
       cstates.set(id, key);
       win.webContents.send('mv:cstate', id, key);
     }).catch(() => {});
   }
-  for (const id of [...cstates.keys()]) if (!views.has(id)) { cstates.delete(id); noticed.delete(id); }
+  for (const id of [...cstates.keys()]) if (!views.has(id)) { cstates.delete(id); noticed.delete(id); liveSt.delete(id); }
 }, 2000);
 ipcMain.on('mv:open-viewer', () => openViewer());
 ipcMain.on('vw:dock', () => setTimeout(() => { try { dockViewer(); } catch (e) { appLog('合体に失敗: ' + (e && e.message || e), 'ERROR'); } }, 30));
@@ -1244,7 +1260,7 @@ const liveReaders = new Map();   // lv番号 -> { ctl, maxN, fails }
 function addLiveItems(id, list) {
   const now = Date.now();
   const items = list.filter(c => c && typeof c.x === 'string' && c.x)
-    .map(c => ({ t: (Number(c.at) > 1e9 ? Number(c.at) * 1000 : now), id, no: Number(c.n) || 0, text: c.x.slice(0, 1000), nm: c.nm || '', u: typeof c.u === 'string' ? c.u.slice(0, 80) : '' }));
+    .map(c => ({ t: (Number(c.at) > 1e9 ? Number(c.at) * 1000 : now), id, no: Number(c.n) || 0, vt: (c.ts && c.vtv !== undefined) ? Math.max(0, c.vtv) : undefined, text: c.x.slice(0, 1000), nm: c.nm || '', u: typeof c.u === 'string' ? c.u.slice(0, 80) : '' }));
   if (!items.length) return;
   commentBuf.push(...items);
   if (commentBuf.length > MAX_BUF) commentBuf.splice(0, commentBuf.length - MAX_BUF);
@@ -1258,7 +1274,7 @@ function setLiveMode(id, mode) {
   liveMode.set(id, mode);
   pushViewer('vw:mode', Object.fromEntries(liveMode));
 }
-const direct = require('./live-direct.js').make({ fetch: (u, o) => net.fetch(u, o), WebSocket, ua: app.userAgentFallback });
+const direct = require('./live-direct.js').make({ fetch: (u, o) => net.fetch(u, o), fetchAuth: (u, o) => ses().fetch(u, o), WebSocket, ua: app.userAgentFallback });
 const sleepAbort = (ms, sig) => new Promise(res => { const t = setTimeout(res, ms); sig.addEventListener('abort', () => { clearTimeout(t); res(); }, { once: true }); });
 
 // サイト経由(SSE)。 約5分たったら戻って、直接をもう一度試す
@@ -1295,7 +1311,7 @@ async function siteSession(id, st) {
   }
 }
 // 直接・サイト経由のどちらから来たコメントも、番号で重複を除いて送る
-function emitChats(id, st, list) {
+function emitChats(id, st, list, keepOrder) {
   if (!st.seen) st.seen = new Set();
   const fresh = [];
   for (const c of list) {
@@ -1304,7 +1320,66 @@ function emitChats(id, st, list) {
     fresh.push(c);
   }
   if (st.seen.size > 3000) { const keep = [...st.seen].slice(-1500); st.seen.clear(); keep.forEach(n => st.seen.add(n)); }
-  addLiveItems(id, fresh.sort((a, b) => (a.n || 0) - (b.n || 0)));
+  addLiveItems(id, keepOrder ? fresh : fresh.sort((a, b) => (a.n || 0) - (b.n || 0)));
+}
+// タイムシフト(放送終了後)の枠: 再生位置に合わせてコメントを受け取る(ログインが必要)
+const TS_LEAD_V = 0;   // vposで見るときの補正(秒)。映像側のコメントとの実測のずれ
+const TS_LEAD = 0;   // 映像のコメントとの時刻のずれ(秒)。実測で調整した値
+async function tsLoop(id, st) {
+  setLiveMode(id, 'direct');
+  appLog(`${id}: タイムシフトのコメントの受け取りを開始`);
+  const ctx = {
+    cookie: async () => { try { return (await ses().cookies.get({ url: 'https://live.nicovideo.jp' })).map(c => c.name + '=' + c.value).join('; '); } catch { return ''; } },
+    getPos: async () => { const v = views.get(id); if (!v || v.webContents.isDestroyed()) return -1; try { return Number(await v.webContents.executeJavaScript('(() => { const v = document.querySelector("video"); return v ? v.currentTime : -1; })()')); } catch { return -1; } },
+  };
+  // 区切りごとにまとめて届くので、映像のコメントと合うよう、再生位置に追いついたものから順に出す
+  let base = 0; const pend = [];
+  // 同じ秒のコメントが一度に出ないよう、その秒の中で番号順に少しずつずらす
+  // コメントの再生時刻(vpos: 番組の基準時刻からの10ms単位)があればそれで、なければ受信時刻で並べる。
+  // 同じ時刻のものは、番号順に少しずつずらす
+  const keyOf = c => (c.vp >= 0 ? c.vp / 100 - voff + TS_LEAD_V : (Number(c.at) || 0) - base - voff + TS_LEAD);
+  const spread = list => {
+    const g = new Map();
+    for (const c of list) { if (c.vp >= 0) { c.k = keyOf(c); continue; } const k = Math.floor(keyOf(c)); if (!g.has(k)) g.set(k, []); g.get(k).push(c); }
+    for (const arr of g.values()) { arr.sort((x, y) => (x.n || 0) - (y.n || 0)); arr.forEach((c, i) => { c.k = keyOf(c) + i / arr.length; }); }
+  };
+  let covered = 0, released = 0, lastLog = 0; const pushed = new Set();
+  ctx.log = m => appLog(`${id}: [TS] ${m}`);
+  let voff = 0;
+  ctx.setBase = (b, o) => { base = b; voff = o || 0; };
+  ctx.setCovered = c => { covered = c; };
+  ctx.onReset = back => {
+    pend.length = 0; pushed.clear();
+    if (back) {   // 巻き戻したときは、その枠のコメビュの表示を消して、再生に合わせてもう一度出す
+      for (let i = commentBuf.length - 1; i >= 0; i--) if (commentBuf[i].id === id) commentBuf.splice(i, 1);
+      if (st.seen) st.seen.clear();
+      pushViewer('vw:clear-src', id);
+    }
+  };   // シークしたら、待っていたコメントは捨てる
+  const timer = setInterval(async () => {
+    if (!pend.length || !base) return;
+    const pos = await ctx.getPos(); if (!(pos >= 0)) return;
+    const due = []; for (let i = pend.length - 1; i >= 0; i--) if (pend[i].k <= pos && pend[i].k <= covered - 3) due.push(pend.splice(i, 1)[0]);
+    if (Date.now() - lastLog > 5000) { lastLog = Date.now(); appLog(`${id}: [TS] 状態 再生位置=${pos.toFixed(1)}s 先読み済み=${covered.toFixed(0)}s 待機中=${pend.length}件 表示済み=${released}件` + (pend.length ? ` 最早k=${Math.min(...pend.map(c => c.k)).toFixed(1)}s` : '')); }
+    // 再生位置より5秒以上前のものは、出さずに捨てる(シークの直後などに、昔のコメントが一度に出ないように)
+    for (let i = due.length - 1; i >= 0; i--) if (due[i].k < pos - 5) due.splice(i, 1);
+    if (due.length) { released += due.length; due.sort((a, b) => (a.k - b.k) || ((a.n || 0) - (b.n || 0))); due.forEach(c => { c.ts = true; c.vtv = c.k; }); emitChats(id, st, due, true); }
+    if (pend.length > 2000) pend.splice(0, pend.length - 2000);
+  }, 200);
+  st.ctl.signal.addEventListener('abort', () => clearInterval(timer), { once: true });
+  let tries = 0;
+  while (!st.ctl.signal.aborted && views.has(id) && tries < 4) {
+    let got = false;
+    try { await direct.runTimeshift(id, st.ctl.signal, { onSegment: () => { got = true; }, onChats: list => { const fresh = list.filter(c => !(c.n && pushed.has(c.n)) && (c.n ? pushed.add(c.n) : true)); spread(fresh); for (const c of fresh) pend.push(c); } }, ctx); }
+    catch (e) {
+      if (st.ctl.signal.aborted) break;
+      if (e && e.nologin) { appLog(`${id}: タイムシフトのコメントはログインが必要です`, 'WARN'); break; }
+      appLog(`${id}: タイムシフトのコメントを受け取れません: ${e && e.message || e}`, 'WARN');
+    }
+    if (got) tries = 0; else tries++;
+    await sleepAbort(5000, st.ctl.signal);
+  }
+  clearInterval(timer);
 }
 async function liveLoop(id, st) {
   let directFails = 0;
@@ -1318,7 +1393,7 @@ async function liveLoop(id, st) {
       setLiveMode(id, 'direct');
       try {
         await direct.run(id, rc.signal, { onSegment: () => { gotSeg = true; }, onChats: list => emitChats(id, st, list) });
-      } catch (e) { if (e && e.gone) st.gone = true; }
+      } catch (e) { if (e && e.gone) { clearTimeout(guard); rc.abort(); await tsLoop(id, st); break; } }
       clearTimeout(guard); rc.abort();
       if (st.ctl.signal.aborted || st.gone) break;
       if (gotSeg) { directFails = 0; await sleepAbort(2000, st.ctl.signal); continue; }

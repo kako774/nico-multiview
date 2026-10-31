@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('vw', {
   onMode: cb => ipcRenderer.on('vw:mode', (_e, m) => cb(m)),
   onSources: cb => ipcRenderer.on('vw:sources', (_e, s) => cb(s)),
   copy: t => ipcRenderer.send('vw:copy', String(t || '')),
+  onClearSrc: cb => ipcRenderer.on('vw:clear-src', (_e, id) => cb(id)),
   clear: () => ipcRenderer.send('vw:clear'),
   onTop: v => ipcRenderer.send('vw:ontop', !!v),
   onOpt: cb => ipcRenderer.on('vw:opt', (_e, o) => cb(o)),

@@ -66,7 +66,7 @@ function collect(b, depth, acc) {
       for (const y of parseFields(x.b) || []) if (y.f === 1 && y.t === 2) {
         const c = parseFields(y.b);
         if (!isChat(c)) continue;
-        let raw = null, hashed = null, text = '', name = '', no = 0, prem = 0;
+        let raw = null, hashed = null, text = '', name = '', no = 0, prem = 0, vp = -1;
         for (const z of c) {
           if (z.f === 5 && z.t === 0) raw = z.v;
           if (z.f === 6 && z.t === 2) hashed = asText(z.b);
@@ -74,8 +74,9 @@ function collect(b, depth, acc) {
           if (z.f === 2 && z.t === 2) name = asText(z.b);
           if (z.f === 8 && z.t === 0) no = z.v;
           if (z.f === 4 && z.t === 0) prem = z.v;
+          if (z.f === 3 && z.t === 0) vp = z.v;
         }
-        acc.push({ at, u: raw ? 'r' + raw : 'h' + hashed, x: text, n: no, nm: name, pr: prem });
+        acc.push({ at, u: raw ? 'r' + raw : 'h' + hashed, x: text, n: no, nm: name, pr: prem, vp });
       }
     }
     return;
@@ -116,6 +117,14 @@ function make(env) {
   const headers = extra => Object.assign({ 'user-agent': env.ua }, extra || {});
   const watchBase = env.watchBase || 'https://live.nicovideo.jp/watch/';
 
+  async function watchProps(id, sig, cookie) {
+    const res = await (cookie ? env.fetchAuth || env.fetch : env.fetch)(watchBase + id, { headers: headers({ accept: 'text/html' }), signal: sig });
+    if (!res.ok) throw new Error('watch http ' + res.status);
+    const html = await res.text();
+    const m = html.match(/id="embedded-data"[^>]*data-props="([^"]*)"/);
+    if (!m) throw new Error('no embedded-data');
+    return JSON.parse(unescapeAttr(m[1]));
+  }
   async function watchSocketUrl(id, sig) {
     const res = await env.fetch(watchBase + id, { headers: headers({ accept: 'text/html' }), signal: sig });
     if (!res.ok) throw new Error('watch http ' + res.status);
@@ -128,13 +137,13 @@ function make(env) {
     if (!ws) throw new Error('no webSocketUrl');
     return ws;
   }
-  function messageServerUri(wsUrl, sig) {
+  function messageServerUri(wsUrl, sig, cookie) {
     return new Promise((resolve, reject) => {
       let ws, done = false;
       const fin = (fn, v) => { if (done) return; done = true; clearTimeout(t); try { ws.close(); } catch { /* 無視 */ } fn(v); };
       const t = setTimeout(() => fin(reject, new Error('ws timeout')), 8000);
       if (sig) sig.addEventListener('abort', () => fin(reject, new Error('aborted')), { once: true });
-      try { ws = new env.WebSocket(wsUrl, { headers: headers({ origin: 'https://live.nicovideo.jp' }) }); }
+      try { ws = new env.WebSocket(wsUrl, { headers: headers(Object.assign({ origin: 'https://live.nicovideo.jp' }, cookie ? { cookie } : {})) }); }
       catch (e) { return fin(reject, e); }
       ws.onopen = () => ws.send(JSON.stringify({ type: 'startWatching', data: { stream: { quality: 'abr', protocol: 'hls', latency: 'low', chasePlay: false }, room: { protocol: 'webSocket', commentable: true }, reconnect: false } }));
       ws.onmessage = ev => {
@@ -218,7 +227,77 @@ function make(env) {
       await sleep(3000, sig);
     }
   }
-  return { run, watchSocketUrl, messageServerUri, recentUris };
+  // タイムシフト(放送終了後)のコメント。
+  //   取得口(view)に ?at=<時刻> でつなぐと、その時刻の区切り(segment: from〜until, uri)と、次の時刻(next.at)が返る。
+  //   next を順にたどって、再生位置より先まで区切りをまとめて読んでおく(先読み)。
+  //   コメントは hooks.onChats に渡し、表示のタイミングと順番は呼び出し側が再生位置で決める。
+  //   ログイン中のクッキーでつなぐ(匿名では見られない)。 ctx: { cookie, getPos, setBase, setCovered }
+  const tsOf = b => { const f = parseFields(b); if (!f) return 0; const s = f.find(x => x.f === 1 && x.t === 0); return s ? s.v : 0; };
+  function segsOf(entries) {
+    const out = []; let next = 0;
+    for (const e of entries) for (const x of parseFields(e) || []) {
+      if (x.t !== 2) continue;
+      if (x.f === 3 || x.f === 2) {   // segment / previous
+        const q = parseFields(x.b) || [];
+        const u = q.find(y => y.f === 3 && y.t === 2);
+        if (u) { const t = asText(u.b); if (/^https?:\/\//.test(t)) out.push({ uri: t, from: tsOf((q.find(y => y.f === 1 && y.t === 2) || {}).b || Buffer.alloc(0)), until: tsOf((q.find(y => y.f === 2 && y.t === 2) || {}).b || Buffer.alloc(0)) }); }
+      } else if (x.f === 4) {   // next
+        const q = parseFields(x.b) || [];
+        if (q[0] && q[0].t === 0) next = q[0].v;
+      }
+    }
+    return { out, next };
+  }
+  async function runTimeshift(id, sig, hooks, ctx) {
+    const cookie = await ctx.cookie();
+    if (!cookie) { const e = new Error('not logged in'); e.nologin = true; throw e; }
+    const props = await watchProps(id, sig, true);
+    const pr = props.program || {};
+    const base = Number(pr.vposBaseTime) || Number(pr.beginTime) || Number(pr.openTime);
+    if (!(base > 1e9)) throw new Error('no base time');
+    const ws = props.site && props.site.relive && props.site.relive.webSocketUrl;
+    if (!ws) throw new Error('no webSocketUrl (timeshift)');
+    const L = ctx.log || (() => {});
+    L(`開始 status=${pr.status} begin=${pr.beginTime} open=${pr.openTime} vposBase=${pr.vposBaseTime} end=${pr.endTime} base=${base}`);
+    const view = await messageServerUri(ws, sig, cookie);
+    L('取得口(view)に接続');
+    // 映像の0秒は番組の開始(beginTime)で、コメントの時刻(vpos)の基準(vposBaseTime)とは数秒〜数十秒ずれることがある
+    const voff = Math.max(0, (Number(pr.beginTime) || Number(pr.openTime) || base) - base);
+    L(`映像の0秒とvpos基準のずれ=${voff}s`);
+    if (ctx.setBase) ctx.setBase(base, voff);
+    const AHEAD = 45;             // 再生位置より、これだけ先まで読んでおく(秒)
+    const seenUri = new Set();
+    let cursor = null, lastPos = -1, fails = 0;
+    while (!sig.aborted) {
+      const pos = await ctx.getPos();
+      if (!(pos >= 0)) { await sleep(1000, sig); continue; }
+      const nowT = base + voff + pos;
+      // 最初、または大きく飛んだとき(シーク)は、再生位置の少し手前から読み直す
+      if (cursor === null || pos < lastPos - 3 || nowT > cursor + 20) { if (cursor !== null && ctx.onReset) ctx.onReset(pos < lastPos - 3);
+        L(`読み直し(${cursor === null ? '開始' : pos < lastPos - 3 ? '巻き戻し' : '遅れ/先へ移動'}) 再生位置=${pos.toFixed(1)}s`); cursor = Math.max(Math.floor(base), Math.floor(nowT) - 20); if (ctx.setCovered) ctx.setCovered(cursor - base - voff); }
+      lastPos = pos;
+      if (cursor > nowT + AHEAD) { await sleep(700, sig); continue; }
+      try {
+        const list = await readBody(view + '?at=' + cursor, 30000, 3000, hasNext, 600, sig);
+        const { out, next } = segsOf(splitDelimited(list));
+        fails = 0;
+        L(`view at=${Math.round(cursor - base - voff)}s(再生位置${pos.toFixed(1)}s) bytes=${list.length} 区切り=${out.length}[${out.map(s => (s.from ? Math.round(s.from - base) : '?') + '~' + (s.until ? Math.round(s.until - base) : '?')).join(',')}] next=${next ? Math.round(next - base) + 's' : 'なし'}`);
+        const jobs = [];
+        for (const sg of out) if (!seenUri.has(sg.uri)) { seenUri.add(sg.uri); jobs.push(readBody(sg.uri, 8e6, 8000, null, 1500, sig).then(buf => {
+          const acc = []; for (const m of splitDelimited(buf)) collect(m, 0, acc);
+          const vs = acc.map(c => c.vp).filter(v => v >= 0), ats = acc.map(c => c.at);
+          L(`区切り取得 bytes=${buf.length} コメント=${acc.length} vpos=${vs.length ? (Math.min(...vs) / 100).toFixed(0) + '~' + (Math.max(...vs) / 100).toFixed(0) + 's' : 'なし'} at=${ats.length ? Math.round(Math.min(...ats) - base) + '~' + Math.round(Math.max(...ats) - base) + 's' : 'なし'}`);
+          if (acc.length) hooks.onChats(acc); hooks.onSegment();
+        }).catch(e => { L('区切り取得に失敗: ' + (e && e.message || e)); seenUri.delete(sg.uri); })); }
+        await Promise.all(jobs);
+        if (seenUri.size > 400) { const k = [...seenUri].slice(-150); seenUri.clear(); k.forEach(x => seenUri.add(x)); }
+        const step = next > cursor ? next : cursor + 15;
+        cursor = step;
+        if (ctx.setCovered) ctx.setCovered(cursor - base - voff);
+      } catch (e) { if (sig.aborted) return; L('取得失敗: ' + (e && e.message || e)); if (++fails >= 5) throw e; await sleep(1500, sig); }
+    }
+  }
+  return { run, runTimeshift, watchSocketUrl, messageServerUri, recentUris };
 }
 
 module.exports = { make, parseFields, splitDelimited, collect, readVarint };

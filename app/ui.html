@@ -66,6 +66,7 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--o
 body.nosm .sm{display:none!important}
 .head button.live{font-weight:800;font-size:13px;letter-spacing:.03em;color:#fff;background:#d93025;border-color:#d93025}
 .head button.live:hover{filter:brightness(1.1)}
+.head button.live.behind{background:#7a8190;border-color:#7a8190}
 .tile.rkd .tag{flex:0 1 auto;min-width:8em}.tile.rkd .tag .tt{min-width:2em}
 .tile{container-type:inline-size}
 @container (max-width:620px){.head .vol,.head .volv{display:none}}
@@ -261,7 +262,9 @@ body.showCmt .foot{display:flex}
     i.title = off ? i.placeholder : '';
   }
   window.mv.onNotice((id, text) => say(`${nameOf(id)}: ${text}`, true));
+  const liveBehind = new Map(), tsEnded = new Map();
   window.mv.onCState((id, why) => { cstate.set(id, why); applyFoot(id); });
+  window.mv.onLiveState((id, on, ended) => { tsEnded.set(id, !!ended); const t = stage.querySelector('[data-id="' + id + '"]'); const b = t && t.querySelector('button.live'); if (b) b.classList.toggle('behind', !on); liveBehind.set(id, !on); });
 
   /* ---------- ラベル(放送者名) ---------- */
   function updateTags() {
@@ -433,7 +436,8 @@ body.showCmt .foot{display:flex}
     }, 'cm');
     cm.classList.toggle('off', !!hideCmts[id]);
     const rw = mk('⏪', '10秒戻す(タイムシフト・プレミアム会員)', () => window.mv.player(id, 'back'), 'rw');
-    const lv = mk('LIVE', '現在のライブに戻る', () => window.mv.player(id, 'live'), 'live');
+    const lv = mk('LIVE', '現在のライブに戻る', () => { if (tsEnded.get(id)) { say('この放送は終了しているため、ライブには戻れません(タイムシフト再生中です)'); return; } window.mv.player(id, 'live'); }, 'live');
+    lv.classList.toggle('behind', !!liveBehind.get(id));
     head.append(tag, grow, vol, volv, rw, lv, snd, cm,
       mk('🎁', 'この枠にギフトを贈る(ギフトウィンドウが開きます)', () => window.mv.giftOpen(id), 'giftbtn'),
       (() => { const b = mk('', 'この枠のエモーションを開く(別窓)', () => window.mv.emotion(id), 'emo'); b.style.fontSize = '0'; b.innerHTML = '&#8203;<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.2c.9 1.3 2.1 2 3.5 2s2.6-.7 3.5-2"/><circle cx="9" cy="9.8" r=".6" fill="currentColor"/><circle cx="15" cy="9.8" r=".6" fill="currentColor"/></svg>'; return b; })(),

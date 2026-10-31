@@ -61,6 +61,7 @@ contextBridge.exposeInMainWorld('mv', {
   dragEnd: () => ipcRenderer.send('mv:drag-end'),
   onDrag: cb => ipcRenderer.on('mv:drag', (_e, d) => cb(d)),
   onNotice: cb => ipcRenderer.on('mv:notice', (_e, id, text) => cb(id, text)),
+  onLiveState: cb => ipcRenderer.on('mv:live-state', (_e, id, on, ended) => cb(id, !!on, !!ended)),
   onCState: cb => ipcRenderer.on('mv:cstate', (_e, id, why) => cb(id, why || '')),
   onInfo: cb => ipcRenderer.on('mv:info', (_e, id, info) => cb(id, info)),
 });

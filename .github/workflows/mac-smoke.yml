@@ -37,6 +37,9 @@ jobs:
           ps aux | grep -i nicomultiview | grep -v grep | wc -l | sed 's/^/processes=/' | tee -a ../smoke/result.txt
           ls ~/Library/Logs/DiagnosticReports 2>/dev/null | grep -i nico >> ../smoke/result.txt || true
           kill $PID 2>/dev/null || true
+          echo "::notice title=result::$(tr '\n' '|' < ../smoke/result.txt)"
+          echo "::notice title=applog::$(head -c 1500 ../smoke/app.log | tr '\n' '|')"
+          echo "::notice title=pngsize::$(stat -f%z ../smoke/screen.png 2>/dev/null)"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

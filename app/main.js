@@ -23,7 +23,7 @@ const NICO_HOST_RE = /^https:\/\/([\w-]+\.)*nicovideo\.jp\//;
 
 let win = null;
 let loginWin = null;
-let viewerOpenPref = false, quitting = false, viewerWin = null, viewerView = null, dockedPref = false, dockW = 420, snapOff = 0;   // viewerView: メインの窓に合体しているコメビュ
+let dockPos = 'right', dockH = 280, viewerOpenPref = false, quitting = false, viewerWin = null, viewerView = null, dockedPref = false, dockW = 420, snapOff = 0;   // viewerView: メインの窓に合体しているコメビュ
 let overlayRect = null;   // メニューの範囲(null=全部隠す)。範囲に重なる枠だけ隠す
 let overlayOpen = false;   // 候補リストなどをHTML側で表示している間は、映像(ネイティブのビュー)を隠す
 const views = new Map(); // lv番号 -> WebContentsView
@@ -220,12 +220,13 @@ function finishUpdate(next) {
   setTimeout(() => app.quit(), 300);
 }
 // 起動したときに、前回の更新の結果をログへ残す
+let justUpdated = false;   // アプリ内更新のあとの最初の起動のとき true(更新したことをお知らせする)
 function logUpdateResult() {
   try {
     const fs = require('fs'), f = path.join(app.getPath('userData'), 'update', 'result.txt');
     if (!fs.existsSync(f)) return;
     const t = fs.readFileSync(f, 'utf8').trim(); fs.rmSync(f, { force: true });
-    if (t === 'OK') appLog(`更新を適用しました(v${app.getVersion()})`);
+    if (t === 'OK') { appLog(`更新を適用しました(v${app.getVersion()})`); justUpdated = true; }
     else appLog('更新の入れ替えに失敗: ' + t.slice(0, 120), 'ERROR');
   } catch { /* 無視 */ }
 }
@@ -537,6 +538,7 @@ function createWindow() {
   win.on('leave-full-screen', () => { exitBarSync(); if (win) win.webContents.send('mv:fs', false); setTimeout(applyGlass, 50); });
   win.loadFile(path.join(__dirname, 'ui.html'));
   win.webContents.on('did-finish-load', applyGlass);
+  if (justUpdated) { justUpdated = false; win.webContents.once('did-finish-load', () => setTimeout(() => { msgBox({ type: 'info', title: 'ニコ生マルチビュー', message: `v${app.getVersion()} に更新しました。`, detail: '主な変更点は、配布ページの更新履歴で確認できます。', buttons: ['更新履歴を見る', '閉じる'], defaultId: 1, cancelId: 1 }).then(r => { if (r.response === 0) shell.openExternal(DL_PAGE + '#changelog'); }).catch(() => {}); }, 2500)); }
   if (viewerOpenPref) win.webContents.once('did-finish-load', () => setTimeout(() => { try { if (win && !win.isDestroyed() && !viewerWin && !viewerView) openViewer(); } catch (e) { appLog('コメビュの復元に失敗: ' + (e && e.message || e), 'ERROR'); } }, 600));
   win.on('closed', () => {
     win = null; views.clear();
@@ -1014,8 +1016,8 @@ function snapPreview(on) {
       snapView.webContents.loadURL(SNAP_HTML);
     }
     const [w] = win.getContentSize(), top = Math.round(tb[0]), h = Math.max(0, Math.round(tb[1] - tb[0]));
-    const width = Math.min(dockW, Math.round(w * 0.6));
-    snapView.setBounds({ x: w - width, y: top, width, height: h });
+    if (dockPos === 'bottom') { const [, ch] = win.getContentSize(); const hh = Math.min(dockH, Math.round(ch * 0.6)); snapView.setBounds({ x: 0, y: ch - hh, width: w, height: hh }); }
+    else { const width = Math.min(dockW, Math.round(w * 0.6)); snapView.setBounds({ x: w - width, y: top, width, height: h }); }
     win.contentView.addChildView(snapView); snapShown = true;
   }).catch(() => {});
 }
@@ -1024,6 +1026,7 @@ function nearDockEdge() {
   if (!viewerWin || viewerWin.isDestroyed() || !win || win.isDestroyed() || win.isMinimized() || win.isFullScreen() || viewerWin.isMaximized() || Date.now() < snapOff) return false;
   // 合体できる範囲: メインの窓の「右側」(ここに合体したときに入る幅)の中。ここにマウスを持っていって離すと合体する(窓の外側では合体しない)
   const b = win.getContentBounds(), p = screen.getCursorScreenPoint();
+  if (dockPos === 'bottom') { const zh = Math.min(dockH, Math.round(b.height * 0.6)); return p.y >= b.y + b.height - zh && p.y <= b.y + b.height && p.x >= b.x && p.x <= b.x + b.width; }
   const zone = Math.min(dockW, Math.round(b.width * 0.6));
   return p.x >= b.x + b.width - zone && p.x <= b.x + b.width && p.y >= b.y && p.y <= b.y + b.height;
 }
@@ -1227,6 +1230,7 @@ ipcMain.on('mv:dock-rect', (_e, r) => {
   if (!r || ![r.x, r.y, r.width, r.height].every(Number.isFinite)) { try { viewerView.setVisible(false); } catch { /* 無視 */ } return; }
   try { viewerView.setVisible(true); viewerView.setBounds({ x: Math.round(r.x), y: Math.round(r.y), width: Math.max(0, Math.round(r.width)), height: Math.max(0, Math.round(r.height)) }); } catch { /* 無視 */ }
 });
+ipcMain.on('mv:dock-pos', (_e, p, h) => { dockPos = p === 'bottom' ? 'bottom' : 'right'; if (Number.isFinite(h) && h >= 120 && h <= 900) dockH = Math.round(h); });
 ipcMain.on('mv:dock-width', (_e, w) => { if (Number.isFinite(w) && w >= 280 && w <= 1400) { dockW = Math.round(w); saveDock(); } });
 let viewerOpt = { hideSrc: false, simple: false };   // コメビュの表示設定(設定画面から届く)
 ipcMain.handle('vw:init', () => ({ backlog: commentBuf, sources: sourcesList(), modes: Object.fromEntries(liveMode), opt: viewerOpt, theme: curTheme, acrylic: glassOk }));

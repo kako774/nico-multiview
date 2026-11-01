@@ -56,6 +56,7 @@ contextBridge.exposeInMainWorld('mv', {
   viewerOpt: o => ipcRenderer.send('mv:viewer-opt', o),
   onDock: cb => ipcRenderer.on('mv:dock', (_e, on, w) => cb(!!on, Number(w) || 0)),
   dockRect: r => ipcRenderer.send('mv:dock-rect', r),
+  dockPos: (p, h) => ipcRenderer.send('mv:dock-pos', p, h),
   dockWidth: w => ipcRenderer.send('mv:dock-width', w),
   dragStart: id => ipcRenderer.send('mv:drag-start', id),
   dragEnd: () => ipcRenderer.send('mv:drag-end'),

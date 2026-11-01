@@ -234,7 +234,8 @@ body.sugmode #root{padding:0}
     root.textContent = '';
     const row = (label, ctl) => { const r = el('div', 'srow'); r.append(el('span', '', label), ctl); root.appendChild(r); };
     const sel = (opts, cur, act) => { const s = el('select'); opts.forEach(([v, t]) => s.add(new Option(t, v))); s.value = cur; s.addEventListener('change', () => window.menu.act(act, s.value, true)); return s; };
-    row('テーマ', sel([['system', '自動'], ['light', 'ライト'], ['dark', 'ダーク'], ['glassb', 'ガラス(Windows 11風)'], ['glassc', 'ガラス(明るい)'], ['glassf', 'ガラス(スモーク)']], data.theme || 'system', 'set-theme'));
+    row('コメビュの位置', sel([['right', '映像の右'], ['bottom', '映像の下']], data.dockPos || 'right', 'set-dockpos'));
+    row('テーマ', sel([['system', '自動'], ['light', 'ライト'], ['dark', 'ダーク'], ['glassb', 'ガラス(ダーク)'], ['glassc', 'ガラス(明るい)'], ['glassf', 'ガラス(スモーク)']], data.theme || 'system', 'set-theme'));
     const cb = el('input'); cb.type = 'checkbox'; cb.checked = data.playerOnly !== false; cb.title = 'OFFにすると視聴ページ全体を表示します';
     cb.addEventListener('change', () => window.menu.act('set-po', cb.checked, true));
     row('プレイヤーのみ', cb);

@@ -92,6 +92,10 @@ body.fs #bar,body.clean #bar{display:none}
 #dock{flex:0 0 auto;width:420px;display:none;background:var(--panel)}
 body.docked #split,body.docked #dock{display:block}
 body.fs #split,body.fs #dock,body.clean #split,body.clean #dock{display:none}
+/* コメビュの位置を「下」にしたとき: 映像の下に、横いっぱいで置く */
+body.dockb #main{flex-direction:column}
+body.dockb #split{flex:0 0 7px;cursor:row-resize}
+body.dockb #dock{width:auto!important;flex:0 0 auto}
 #stage{position:absolute;inset:0;display:grid;gap:4px;padding:4px}
 .tile{display:flex;flex-direction:column;min-width:0;min-height:0;border:1px solid var(--line);border-radius:4px;background:var(--tilebg);overflow:hidden}
 .tile.dragover{outline:3px solid var(--accent);outline-offset:-3px}
@@ -132,28 +136,26 @@ body.showCmt .foot{display:flex}
 #empty b{color:var(--text);font-size:17px}
 #empty code{background:var(--btn);padding:1px 6px;border-radius:4px}
 
-/* ガラステーマ3種: B=Windows 11風(ダーク) / C=明るいフロスト / F=スモーク。Windows 11 では窓の背景もすりガラスになる */
+/* ガラステーマ3種: B=ダーク / C=明るいフロスト / F=スモーク。Windows 11 では窓の背景もすりガラスになる */
 /* B  Windows 11 風(Acrylic/Mica・ダーク) */
 :root[data-theme="glassb"]{--bg:transparent;--panel:rgba(32,34,46,.55);--line:rgba(255,255,255,.12);--text:#f3f4f8;--sub:#aab0c4;--accent:#7fb2ff;--input:rgba(0,0,0,.28);
 --btn:rgba(255,255,255,.08);--btnhv:#7fb2ff;--onaccent:#08142b;--tilebg:rgba(255,255,255,.04);--stagebg:transparent;--tagbg:rgba(0,0,0,.45);--hl:rgba(127,178,255,.3);color-scheme:dark}
 :root[data-theme="glassb"] #bar,:root[data-theme="glassb"] .head,:root[data-theme="glassb"] .foot{backdrop-filter:blur(30px) saturate(1.6)}
 :root[data-theme="glassb"] button,:root[data-theme="glassb"] select{border-color:rgba(255,255,255,.14)!important;border-radius:6px!important}
 :root[data-theme="glassb"] .tile{border-color:rgba(255,255,255,.1);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.35)}
-:root[data-theme="glassb"]:not(.acrylic){background:radial-gradient(700px 420px at 15% 15%,#5b3fd0 0,transparent 60%),radial-gradient(700px 500px at 90% 20%,#1e88e5 0,transparent 60%),radial-gradient(700px 400px at 50% 110%,#e0457b 0,transparent 60%),linear-gradient(160deg,#10142a,#1b2145)}
 /* C  macOS風(明るいフロスト) */
 :root[data-theme="glassc"]{--bg:transparent;--panel:rgba(255,255,255,.55);--line:rgba(0,0,0,.1);--text:#1c1f26;--sub:#5d6475;--accent:#0a84ff;--input:rgba(255,255,255,.7);
 --btn:rgba(255,255,255,.75);--btnhv:#0a84ff;--onaccent:#fff;--tilebg:rgba(255,255,255,.35);--stagebg:transparent;--tagbg:rgba(255,255,255,.75);--hl:rgba(10,132,255,.2);color-scheme:light}
 :root[data-theme="glassc"] #bar,:root[data-theme="glassc"] .head,:root[data-theme="glassc"] .foot{backdrop-filter:blur(28px) saturate(1.8)}
 :root[data-theme="glassc"] button,:root[data-theme="glassc"] select{border-radius:8px!important;box-shadow:0 1px 2px rgba(0,0,0,.12)}
 :root[data-theme="glassc"] .tile{border-radius:12px;border-color:rgba(255,255,255,.8);box-shadow:0 6px 20px rgba(60,70,100,.18)}
-:root[data-theme="glassc"]:not(.acrylic){background:radial-gradient(700px 420px at 15% 10%,#ffd1a6 0,transparent 60%),radial-gradient(700px 500px at 90% 20%,#a6c8ff 0,transparent 60%),radial-gradient(700px 400px at 50% 110%,#c8f0d0 0,transparent 60%),linear-gradient(160deg,#e9edf6,#f6e9ef)}
+:root[data-theme="glassc"]:not(.acrylic){background:#eef1f6}
 /* F  スモークガラス(黒く落ち着いた半透明) */
 :root[data-theme="glassf"]{--bg:transparent;--panel:rgba(8,8,12,.62);--line:rgba(255,255,255,.1);--text:#ececf2;--sub:#9a9cab;--accent:#8ab4ff;--input:rgba(255,255,255,.07);
 --btn:rgba(255,255,255,.06);--btnhv:#8ab4ff;--onaccent:#071228;--tilebg:rgba(0,0,0,.25);--stagebg:transparent;--tagbg:rgba(0,0,0,.6);--hl:rgba(138,180,255,.25);color-scheme:dark}
 :root[data-theme="glassf"] #bar,:root[data-theme="glassf"] .head,:root[data-theme="glassf"] .foot{backdrop-filter:blur(8px)}
 :root[data-theme="glassf"] button,:root[data-theme="glassf"] select{border-color:rgba(255,255,255,.1)!important}
 :root[data-theme="glassf"] .tile{border-color:rgba(255,255,255,.08)}
-:root[data-theme="glassf"]:not(.acrylic){background:radial-gradient(700px 420px at 15% 15%,#5b3fd0 0,transparent 60%),radial-gradient(700px 500px at 90% 20%,#1e88e5 0,transparent 60%),radial-gradient(700px 400px at 50% 110%,#e0457b 0,transparent 60%),linear-gradient(160deg,#10142a,#1b2145)}
 
 /* 選択肢の一覧は、背景が透けないよう、はっきりした色にする */
 :root[data-theme="glassb"] option{background:#232638;color:#f3f4f8}
@@ -190,7 +192,7 @@ body.showCmt .foot{display:flex}
 <div id="setPanel" hidden>
   <div class="srow"><label for="theme">テーマ</label>
     <select id="theme" aria-label="テーマ" title="画面の明るさ">
-      <option value="system">自動</option><option value="light">ライト</option><option value="dark">ダーク</option><option value="glassb">ガラス(Windows 11風)</option><option value="glassc">ガラス(明るい)</option><option value="glassf">ガラス(スモーク)</option>
+      <option value="system">自動</option><option value="light">ライト</option><option value="dark">ダーク</option><option value="glassb">ガラス(ダーク)</option><option value="glassc">ガラス(明るい)</option><option value="glassf">ガラス(スモーク)</option>
     </select></div>
   <div class="srow"><label for="playerOnly">プレイヤーのみ</label>
     <input id="playerOnly" type="checkbox" checked title="OFFにすると視聴ページ全体を表示します"></div>
@@ -218,7 +220,7 @@ body.showCmt .foot{display:flex}
   const $ = s => document.querySelector(s);
   const stage = $('#stage'), emptyEl = $('#empty'), msg = $('#msg'), layoutSel = $('#layout');
   let items = [], layout = 'auto', audioIds = [];   // 音声ONの枠(複数可)
-  let playerOnly = true, showCmt = true, use184 = false, loggedIn = false, loginVia = '', audioOnAdd = true, hideSrcName = false, viewerSimple = false, alwaysTop = false, evAudioAll = false, shotDir = '', singleOpen = false, seekOn = true, showSm = true;
+  let dockPos = 'right', dockH = 280, playerOnly = true, showCmt = true, use184 = false, loggedIn = false, loginVia = '', audioOnAdd = true, hideSrcName = false, viewerSimple = false, alwaysTop = false, evAudioAll = false, shotDir = '', singleOpen = false, seekOn = true, showSm = true;
   let theme = 'system';
   let hideCmts = {};   // 枠ごとの「流れるコメントを隠す」
   let volumes = {}, lastVol = 0.5;   // 枠ごとの音量(0〜1)と、最後に動かした音量(新しい枠の初期値)
@@ -230,7 +232,7 @@ body.showCmt .foot{display:flex}
   const infos = new Map();   // lv番号 -> { name: 放送者名, title: 番組名 }
 
   const parseIds = t => [...new Set((String(t || '').match(/lv\d+/gi) || []).map(s => s.toLowerCase()))];
-  const persist = () => window.mv.save({ items, layout, audioIds, playerOnly, showCmt, use184, audioOnAdd, evAudioAll, singleOpen, seekOn, showSm, shotDir, hideSrcName, viewerSimple, alwaysTop, volumes, lastVol, hideCmts, theme, evTrack, evKeys, presets });
+  const persist = () => window.mv.save({ items, layout, audioIds, playerOnly, showCmt, use184, audioOnAdd, evAudioAll, singleOpen, seekOn, showSm, shotDir, hideSrcName, viewerSimple, dockPos, dockH, alwaysTop, volumes, lastVol, hideCmts, theme, evTrack, evKeys, presets });
   // 表示名: 放送者名(取得できるまではlv番号)
   const shotDirDef = '(ピクチャ\\ニコ生マルチビュー)';
   const nameOf = id => (infos.get(id) && infos.get(id).name) || id;
@@ -353,17 +355,29 @@ body.showCmt .foot{display:flex}
     const r = dockEl.getBoundingClientRect();
     window.mv.dockRect({ x: r.left, y: r.top, width: r.width, height: r.height });
   }
+  function applyDockPos() {
+    document.body.classList.toggle('dockb', dockPos === 'bottom');
+    dockEl.style.width = dockPos === 'bottom' ? '' : dockW + 'px';
+    dockEl.style.height = dockPos === 'bottom' ? dockH + 'px' : '';
+    splitEl.title = dockPos === 'bottom' ? 'ドラッグで高さを変える' : 'ドラッグで幅を変える';
+    window.mv.dockPos(dockPos, dockH);
+    layoutNow(); setTimeout(layoutNow, 120);
+  }
   window.mv.onDock((on, w) => {
     dockOn = !!on; if (w >= 280) dockW = w;
-    dockEl.style.width = dockW + 'px';
+    dockEl.style.width = dockPos === 'bottom' ? '' : dockW + 'px';
     document.body.classList.toggle('docked', dockOn);
     layoutNow(); setTimeout(layoutNow, 120);
   });
   splitEl.addEventListener('pointerdown', ev => {
     ev.preventDefault(); splitEl.setPointerCapture(ev.pointerId); splitEl.classList.add('drag');
-    const startX = ev.clientX, startW = dockW;
-    const mv = e => { dockW = Math.max(280, Math.min(Math.round(window.innerWidth * 0.6), startW + (startX - e.clientX))); dockEl.style.width = dockW + 'px'; layoutNow(); };
-    const up = () => { splitEl.classList.remove('drag'); splitEl.removeEventListener('pointermove', mv); splitEl.removeEventListener('pointerup', up); splitEl.removeEventListener('pointercancel', up); window.mv.dockWidth(dockW); };
+    const startX = ev.clientX, startW = dockW, startY = ev.clientY, startH = dockH, bottom = dockPos === 'bottom';
+    const mv = e => {
+      if (bottom) { dockH = Math.max(120, Math.min(Math.round(window.innerHeight * 0.7), startH + (startY - e.clientY))); dockEl.style.height = dockH + 'px'; }
+      else { dockW = Math.max(280, Math.min(Math.round(window.innerWidth * 0.6), startW + (startX - e.clientX))); dockEl.style.width = dockW + 'px'; }
+      layoutNow();
+    };
+    const up = () => { if (bottom) { window.mv.dockPos(dockPos, dockH); persist(); } splitEl.classList.remove('drag'); splitEl.removeEventListener('pointermove', mv); splitEl.removeEventListener('pointerup', up); splitEl.removeEventListener('pointercancel', up); window.mv.dockWidth(dockW); };
     splitEl.addEventListener('pointermove', mv); splitEl.addEventListener('pointerup', up); splitEl.addEventListener('pointercancel', up);
   });
   // 1つの枠(拡大中ならその枠、なければ最初の枠)の映像エリアが tw×th になるよう、窓の大きさを合わせる
@@ -699,7 +713,7 @@ body.showCmt .foot{display:flex}
   // メニュー(映像と同じネイティブのビューで、いちばん手前に出る)
   function menuData() {
     const names = {}; presets.forEach(p => p.items.forEach(id => { names[id] = nameOf(id); })); items.forEach(id => { names[id] = nameOf(id); });
-    return { fmId: fmTarget, fmName: nameOf(fmTarget), theme, playerOnly, audioOnAdd, evAudioAll, singleOpen, seekOn, showSm, shotDir, shotDirDef: shotDirDef, hideSrcName, viewerSimple, alwaysTop, loggedIn, loginVia, appVersion, update: updateInfo, presets, names, evKeys, evTrack, evN, items: items.slice(), dlgCount: items.length, dlgNames: items.map(nameOf) };
+    return { fmId: fmTarget, fmName: nameOf(fmTarget), theme, playerOnly, audioOnAdd, evAudioAll, singleOpen, seekOn, showSm, shotDir, shotDirDef: shotDirDef, hideSrcName, viewerSimple, dockPos, alwaysTop, loggedIn, loginVia, appVersion, update: updateInfo, presets, names, evKeys, evTrack, evN, items: items.slice(), dlgCount: items.length, dlgNames: items.map(nameOf) };
   }
   let fmTarget = '';
   function openMenu(type, btn) {
@@ -724,6 +738,7 @@ body.showCmt .foot{display:flex}
     }
     if (action === 'set-fit720') { fitVideo(1280, 720); return; }
     if (action === 'set-top') { alwaysTop = !!p; window.mv.alwaysTop(alwaysTop); persist(); window.mv.menuData(menuData()); return; }
+    if (action === 'set-dockpos') { dockPos = p === 'bottom' ? 'bottom' : 'right'; applyDockPos(); persist(); window.mv.menuData(menuData()); return; }
     if (action === 'set-vsimple') { viewerSimple = !!p; window.mv.viewerOpt({ hideSrc: hideSrcName, simple: viewerSimple }); persist(); window.mv.menuData(menuData()); return; }
     if (action === 'set-hsn') { hideSrcName = !p; window.mv.viewerOpt({ hideSrc: hideSrcName, simple: viewerSimple }); persist(); window.mv.menuData(menuData()); return; }
     if (action === 'set-shotdir') { window.mv.pickShotDir(shotDir).then(r => { if (r && r.dir) { shotDir = r.dir; persist(); } window.mv.menuData(menuData()); }); return; }
@@ -851,6 +866,9 @@ body.showCmt .foot{display:flex}
       if (typeof s.shotDir === 'string') shotDir = s.shotDir;
       if (typeof s.hideSrcName === 'boolean') hideSrcName = s.hideSrcName;
       if (typeof s.viewerSimple === 'boolean') viewerSimple = s.viewerSimple;
+      if (s.dockPos === 'bottom') dockPos = 'bottom';
+      if (s.dockH >= 120 && s.dockH <= 900) dockH = Math.round(s.dockH);
+      applyDockPos();
       window.mv.viewerOpt({ hideSrc: hideSrcName, simple: viewerSimple });
       if (typeof s.alwaysTop === 'boolean') { alwaysTop = s.alwaysTop; window.mv.alwaysTop(alwaysTop); }
       if (['system', 'light', 'dark', 'glassb', 'glassc', 'glassf'].includes(s.theme)) theme = s.theme;

@@ -54,7 +54,7 @@ input[type=text]:focus{outline:2px solid var(--accent)}
 .n:hover{text-decoration:underline}
 .x{min-width:0;word-break:break-all;user-select:text;white-space:pre-wrap}
 
-@media (max-width:680px){
+@media all{
   .line{grid-template-columns:auto auto 10px minmax(0,1fr) minmax(0,9em);gap:1px 8px;padding:5px 10px}
   .s{justify-self:end}
   .x{grid-column:1 / -1;grid-row:2}
@@ -67,7 +67,7 @@ body.simple #bar,body.simple #chips,body.simple .no,body.simple .t,body.simple .
 body.simple .line{display:block!important;padding:4px 12px!important}
 body.nosrc .s{display:none}
 body.nosrc .line{grid-template-columns:3.6em 4.4em 10px 9.5em 1fr}
-@media (max-width:680px){ body.nosrc .line{grid-template-columns:auto auto 10px minmax(0,1fr)} }
+@media all{ body.nosrc .line{grid-template-columns:auto auto 10px minmax(0,1fr)} }
 @media (max-width:420px){ body.nosrc .line{grid-template-columns:auto 10px minmax(0,1fr)} }
 #list{overflow-x:hidden}
 #empty{color:var(--sub);text-align:center;padding:36px 16px;line-height:1.9}
@@ -88,28 +88,26 @@ body.nosrc .line{grid-template-columns:3.6em 4.4em 10px 9.5em 1fr}
 .box .note{padding:6px 14px;font-size:12px;color:var(--sub)}
 #latest{position:absolute;right:14px;bottom:14px;display:none;background:var(--accent);border-color:var(--accent);color:var(--onaccent);font-weight:700;padding:5px 12px;border-radius:999px}
 #wrap{position:relative;flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
-/* ガラステーマ3種: B=Windows 11風(ダーク) / C=明るいフロスト / F=スモーク。Windows 11 では窓の背景もすりガラスになる */
+/* ガラステーマ3種: B=ダーク / C=明るいフロスト / F=スモーク。Windows 11 では窓の背景もすりガラスになる */
 /* B  Windows 11 風(Acrylic/Mica・ダーク) */
-:root[data-theme="glassb"]{--bg:transparent;--panel:rgba(32,34,46,.55);--line:rgba(255,255,255,.12);--text:#f3f4f8;--sub:#aab0c4;--accent:#7fb2ff;--input:rgba(0,0,0,.28);
+:root[data-theme="glassb"]{--bg:rgba(0,0,0,.18);--panel:rgba(0,0,0,.34);--line:rgba(255,255,255,.12);--text:#f3f4f8;--sub:#aab0c4;--accent:#7fb2ff;--input:rgba(0,0,0,.28);
 --btn:rgba(255,255,255,.08);--btnhv:#7fb2ff;--onaccent:#08142b;--tilebg:rgba(255,255,255,.04);--stagebg:transparent;--tagbg:rgba(0,0,0,.45);--hl:rgba(127,178,255,.3);color-scheme:dark}
 :root[data-theme="glassb"] #bar,:root[data-theme="glassb"] .head,:root[data-theme="glassb"] .foot{backdrop-filter:blur(30px) saturate(1.6)}
 :root[data-theme="glassb"] button,:root[data-theme="glassb"] select{border-color:rgba(255,255,255,.14)!important;border-radius:6px!important}
 :root[data-theme="glassb"] .tile{border-color:rgba(255,255,255,.1);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.35)}
-:root[data-theme="glassb"]:not(.acrylic){background:radial-gradient(700px 420px at 15% 15%,#5b3fd0 0,transparent 60%),radial-gradient(700px 500px at 90% 20%,#1e88e5 0,transparent 60%),radial-gradient(700px 400px at 50% 110%,#e0457b 0,transparent 60%),linear-gradient(160deg,#10142a,#1b2145)}
 /* C  macOS風(明るいフロスト) */
-:root[data-theme="glassc"]{--bg:transparent;--panel:rgba(255,255,255,.55);--line:rgba(0,0,0,.1);--text:#1c1f26;--sub:#5d6475;--accent:#0a84ff;--input:rgba(255,255,255,.7);
+:root[data-theme="glassc"]{--bg:rgba(255,255,255,.1);--panel:rgba(255,255,255,.26);--line:rgba(0,0,0,.1);--text:#1c1f26;--sub:#4b5263;--accent:#0a84ff;--input:rgba(255,255,255,.45);
 --btn:rgba(255,255,255,.75);--btnhv:#0a84ff;--onaccent:#fff;--tilebg:rgba(255,255,255,.35);--stagebg:transparent;--tagbg:rgba(255,255,255,.75);--hl:rgba(10,132,255,.2);color-scheme:light}
 :root[data-theme="glassc"] #bar,:root[data-theme="glassc"] .head,:root[data-theme="glassc"] .foot{backdrop-filter:blur(28px) saturate(1.8)}
 :root[data-theme="glassc"] button,:root[data-theme="glassc"] select{border-radius:8px!important;box-shadow:0 1px 2px rgba(0,0,0,.12)}
 :root[data-theme="glassc"] .tile{border-radius:12px;border-color:rgba(255,255,255,.8);box-shadow:0 6px 20px rgba(60,70,100,.18)}
-:root[data-theme="glassc"]:not(.acrylic){background:radial-gradient(700px 420px at 15% 10%,#ffd1a6 0,transparent 60%),radial-gradient(700px 500px at 90% 20%,#a6c8ff 0,transparent 60%),radial-gradient(700px 400px at 50% 110%,#c8f0d0 0,transparent 60%),linear-gradient(160deg,#e9edf6,#f6e9ef)}
+:root[data-theme="glassc"]:not(.acrylic){background:#eef1f6}
 /* F  スモークガラス(黒く落ち着いた半透明) */
-:root[data-theme="glassf"]{--bg:transparent;--panel:rgba(8,8,12,.62);--line:rgba(255,255,255,.1);--text:#ececf2;--sub:#9a9cab;--accent:#8ab4ff;--input:rgba(255,255,255,.07);
+:root[data-theme="glassf"]{--bg:rgba(0,0,0,.2);--panel:rgba(0,0,0,.4);--line:rgba(255,255,255,.1);--text:#ececf2;--sub:#9a9cab;--accent:#8ab4ff;--input:rgba(255,255,255,.07);
 --btn:rgba(255,255,255,.06);--btnhv:#8ab4ff;--onaccent:#071228;--tilebg:rgba(0,0,0,.25);--stagebg:transparent;--tagbg:rgba(0,0,0,.6);--hl:rgba(138,180,255,.25);color-scheme:dark}
 :root[data-theme="glassf"] #bar,:root[data-theme="glassf"] .head,:root[data-theme="glassf"] .foot{backdrop-filter:blur(8px)}
 :root[data-theme="glassf"] button,:root[data-theme="glassf"] select{border-color:rgba(255,255,255,.1)!important}
 :root[data-theme="glassf"] .tile{border-color:rgba(255,255,255,.08)}
-:root[data-theme="glassf"]:not(.acrylic){background:radial-gradient(700px 420px at 15% 15%,#5b3fd0 0,transparent 60%),radial-gradient(700px 500px at 90% 20%,#1e88e5 0,transparent 60%),radial-gradient(700px 400px at 50% 110%,#e0457b 0,transparent 60%),linear-gradient(160deg,#10142a,#1b2145)}
 
 :root[data-theme^="glass"] #chips,:root[data-theme^="glass"] .chip{backdrop-filter:blur(8px)}
 :root[data-theme="glassb"]{--chip:rgba(255,255,255,.1);--c0:#6db4ff}
@@ -118,6 +116,13 @@ body.nosrc .line{grid-template-columns:3.6em 4.4em 10px 9.5em 1fr}
 :root[data-theme="glassb"] body,:root[data-theme="glassf"] body{color-scheme:dark}
 
 /* 選択肢の一覧は、背景が透けないよう、はっきりした色にする */
+/* ガラス系テーマでも、右クリックのメニューは透けさせない(読みにくいため) */
+:root[data-theme="glassb"] .menu{background:#1d2030;box-shadow:0 8px 28px #000a}
+:root[data-theme="glassf"] .menu{background:#16171e;box-shadow:0 8px 28px #000a}
+:root[data-theme="glassc"] .menu{background:#fbfbfd;box-shadow:0 8px 28px #0003}
+:root[data-theme="glassb"] .menu button,:root[data-theme="glassf"] .menu button{background:rgba(255,255,255,.07)}
+:root[data-theme="glassc"] .menu button{background:rgba(0,0,0,.05)}
+:root[data-theme] .menu button:hover{background:var(--btnhv)}
 :root[data-theme="glassb"] option{background:#232638;color:#f3f4f8}
 :root[data-theme="glassf"] option{background:#14141b;color:#ececf2}
 :root[data-theme="glassc"] option{background:#ffffff;color:#1c1f26}

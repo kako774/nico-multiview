@@ -69,7 +69,6 @@ body.nosm .sm{display:none!important}
 .head button.live.behind{background:#7a8190;border-color:#7a8190}
 .tile.rkd .tag{flex:0 1 auto;min-width:8em}.tile.rkd .tag .tt{min-width:2em}
 .tile{container-type:inline-size}
-@container (max-width:620px){.head .vol,.head .volv{display:none}}
 @container (max-width:460px){.head button.rw,.head .grow{display:none}}
 .sm .n{background:#8e57d9}.sm .k{background:#e8782a}.sm .g{background:linear-gradient(90deg,#e0457b,#e8b923,#3fb6d9)}
 .sm i.z{opacity:.35}
@@ -110,10 +109,11 @@ body.dragmode .tile.dragover .content{color:var(--text);background:var(--dragon)
 body.dragmode .tile.dragsrc .content::after{content:attr(data-label) "\A(移動中)";white-space:pre}
 .head{flex:0 0 36px;overflow:hidden;font-size:15px;display:flex;gap:5px;align-items:center;padding:0 6px;background:var(--panel);border-bottom:1px solid var(--line)}
 .head button.cm.off{opacity:.55;text-decoration:line-through}
-.vol{width:110px;height:14px;accent-color:var(--accent);cursor:pointer;flex:0 1 110px;min-width:28px;margin:0 2px}
+.vol{width:110px;height:14px;accent-color:var(--accent);cursor:pointer;flex:0 1 110px;min-width:64px;margin:0 2px}
+.head button.more{font-weight:800;letter-spacing:.05em}
 .volv{font-size:11px;color:var(--sub);min-width:3em;text-align:right;font-variant-numeric:tabular-nums;flex:0 0 auto}
 .tag{font-size:14px;font-weight:700;padding:1px 7px;border-radius:5px;background:var(--tagbg);cursor:grab;
-  min-width:3.6em;max-width:none;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  min-width:5.5em;max-width:none;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .head .grow{flex:1;min-width:0}
 .head button.shot{display:inline-flex;align-items:center;justify-content:center;min-height:29px}
 .head button.shot svg{width:16px;height:16px;display:block;flex:none}
@@ -220,7 +220,7 @@ body.showCmt .foot{display:flex}
   const $ = s => document.querySelector(s);
   const stage = $('#stage'), emptyEl = $('#empty'), msg = $('#msg'), layoutSel = $('#layout');
   let items = [], layout = 'auto', audioIds = [];   // 音声ONの枠(複数可)
-  let dockPos = 'right', dockH = 280, playerOnly = true, showCmt = true, use184 = false, loggedIn = false, loginVia = '', audioOnAdd = true, hideSrcName = false, viewerSimple = false, alwaysTop = false, evAudioAll = false, shotDir = '', singleOpen = false, seekOn = true, showSm = true;
+  let dockPos = 'right', dockH = 280, playerOnly = true, showCmt = true, use184 = false, loggedIn = false, loginVia = '', audioOnAdd = true, hideSrcName = false, viewerSimple = false, alwaysTop = false, evAudioAll = false, shotDir = '', singleOpen = false, seekOn = true, showSm = true, fwNotify = false, fwAuto = false, fwOn = [];
   let theme = 'system';
   let hideCmts = {};   // 枠ごとの「流れるコメントを隠す」
   let volumes = {}, lastVol = 0.5;   // 枠ごとの音量(0〜1)と、最後に動かした音量(新しい枠の初期値)
@@ -232,7 +232,7 @@ body.showCmt .foot{display:flex}
   const infos = new Map();   // lv番号 -> { name: 放送者名, title: 番組名 }
 
   const parseIds = t => [...new Set((String(t || '').match(/lv\d+/gi) || []).map(s => s.toLowerCase()))];
-  const persist = () => window.mv.save({ items, layout, audioIds, playerOnly, showCmt, use184, audioOnAdd, evAudioAll, singleOpen, seekOn, showSm, shotDir, hideSrcName, viewerSimple, dockPos, dockH, alwaysTop, volumes, lastVol, hideCmts, theme, evTrack, evKeys, presets });
+  const persist = () => window.mv.save({ fwNotify, fwAuto, fwOn, items, layout, audioIds, playerOnly, showCmt, use184, audioOnAdd, evAudioAll, singleOpen, seekOn, showSm, shotDir, hideSrcName, viewerSimple, dockPos, dockH, alwaysTop, volumes, lastVol, hideCmts, theme, evTrack, evKeys, presets });
   // 表示名: 放送者名(取得できるまではlv番号)
   const shotDirDef = '(ピクチャ\\ニコ生マルチビュー)';
   const nameOf = id => (infos.get(id) && infos.get(id).name) || id;
@@ -454,10 +454,11 @@ body.showCmt .foot{display:flex}
     lv.classList.toggle('behind', !!liveBehind.get(id));
     head.append(tag, grow, vol, volv, rw, lv, snd, cm,
       mk('🎁', 'この枠にギフトを贈る(ギフトウィンドウが開きます)', () => window.mv.giftOpen(id), 'giftbtn'),
+      mk('📢', 'この枠にニコニ広告を出す(広告の画面が別窓で開きます。ログインが必要です)', () => window.mv.ad(id), 'adbtn'),
       (() => { const b = mk('', 'この枠のエモーションを開く(別窓)', () => window.mv.emotion(id), 'emo'); b.style.fontSize = '0'; b.innerHTML = '&#8203;<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.2c.9 1.3 2.1 2 3.5 2s2.6-.7 3.5-2"/><circle cx="9" cy="9.8" r=".6" fill="currentColor"/><circle cx="15" cy="9.8" r=".6" fill="currentColor"/></svg>'; return b; })(),
       mk('★', 'メインにする(この枠を先頭・大きい枠へ)', () => {
         items = [id, ...items.filter(x => x !== id)]; if (layout === 'auto') layout = 'main'; render();
-      }),
+      }, 'star'),
       (() => { const run = async (noCmt) => {
         const r = await window.mv.shot(id, nameOf(id) || '', shotDir, noCmt).catch(e => ({ ok: false, error: '撮影に失敗しました(呼び出し: ' + String(e && e.message || e).slice(0, 60) + ')' }));
         if (!(r && r.ok)) { say((r && r.error) || '撮影に失敗しました', true); return; }
@@ -466,9 +467,22 @@ body.showCmt .foot{display:flex}
           catch (e) { say('クリップボードにコピーできませんでした(ファイルには保存しました)', true); window.mv.log && window.mv.log('WARN', 'スクショのコピーに失敗(画面側): ' + String(e && e.message || e).slice(0, 80)); }
         }   // 成功のときは、メッセージを出さない(ログに残す)
       }; const b = mk('📷', 'この枠の映像(流れるコメントを含む)を撮る: クリップボードにコピーして、保存もします\n右クリック: コメントなしで撮る', () => run(false), 'shot'); b.addEventListener('contextmenu', e => { e.preventDefault(); run(true); }); b.innerHTML = '&#8203;<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.6-2.4h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.2" r="3.6"/></svg>'; return b; })(),
-      mk('↻', '再読込(この枠だけ読み込み直す)', () => window.mv.reload(id)),
-      mk('↗', 'ブラウザで開く(既定のブラウザ)', () => window.mv.external(id)),
+      mk('↻', '再読込(この枠だけ読み込み直す)', () => window.mv.reload(id), 'rel'),
+      mk('↗', 'ブラウザで開く(既定のブラウザ)', () => window.mv.external(id), 'ext'),
       mk('✕', 'この枠を閉じる', () => { items = items.filter(x => x !== id); audioIds = audioIds.filter(x => x !== id); render(); }, 'close'));
+    // 枠が狭くて入りきらないときは、右のボタンから順に「⋯」のメニューへまとめる
+    const HM = [['ext', '↗ ブラウザで開く'], ['rel', '↻ 再読込'], ['star', '★ メインにする'], ['emo', '😀 エモーション'], ['adbtn', '📢 ニコニ広告'], ['giftbtn', '🎁 ギフトを贈る']];
+    const more = mk('⋯', '入りきらないボタンをまとめたメニュー', () => { fmTarget = id; hmFor = id; openMenu('hm', more); }, 'more');
+    more.style.display = 'none'; head.insertBefore(more, head.querySelector('button.close'));
+    const fit = () => {
+      const bs = HM.map(([c]) => head.querySelector('button.' + c));
+      bs.forEach(b => { if (b) b.style.display = ''; }); volv.style.display = ''; vol.style.display = ''; more.style.display = 'none'; head._hid = [];
+      const over = () => head.scrollWidth > head.clientWidth + 1;
+      for (let i = 0; i < bs.length && over(); i++) { if (!bs[i]) continue; bs[i].style.display = 'none'; head._hid.push(HM[i]); more.style.display = ''; }
+      if (over()) volv.style.display = 'none';
+      if (over()) vol.style.display = 'none';
+    };
+    new ResizeObserver(fit).observe(head); t._fit = fit;
     const content = document.createElement('div'); content.className = 'content';
 
     const foot = document.createElement('form'); foot.className = 'foot'; foot.autocomplete = 'off';
@@ -518,7 +532,7 @@ body.showCmt .foot{display:flex}
     persist(); layoutNow();
   }
 
-  function add(text, keepAll) {
+  function add(text, keepAll, quiet) {
     const ids = parseIds(text);
     if (!ids.length) { say('lv番号が見つかりませんでした(例: lv123456789)', true); return; }
     // 設定「追加せず1枠だけで開く」がONなら、いま並んでいる枠を閉じて、指定の放送だけを開く(フォロー中・検索・貼り付け)
@@ -534,7 +548,7 @@ body.showCmt .foot{display:flex}
       if (typeof volumes[id] !== 'number') volumes[id] = lastVol;
     }
     // 設定「追加したときに音声を出す」がONなら、1枠だけ追加したときその枠の音声をONにする(まとめて追加したときは全てミュートで始める)。OFFなら、いつもミュートで始める
-    if (added === 1 && audioOnAdd) { const nid = items[items.length - 1]; if (!audioIds.includes(nid)) audioIds = [...audioIds, nid]; }
+    if (added === 1 && audioOnAdd && !quiet) { const nid = items[items.length - 1]; if (!audioIds.includes(nid)) audioIds = [...audioIds, nid]; }
     render();
     const p = [];
     if (added) p.push(`${added}枠を追加しました`);
@@ -608,6 +622,7 @@ body.showCmt .foot{display:flex}
   });
   // ブラウザからリンクをドラッグして追加(枠の上=メイン側から届く / ツールバー・空き領域=ここで受ける)
   window.mv.onAdd(t => add(t));
+  window.mv.onFollowAdd(l => { if (Array.isArray(l) && l.length) add(l.map(x => x.id).join(' '), true, true); });
   window.mv.onFocus(id => toggleFocus(id));
   window.mv.onUnfocus(() => { if (focusId) toggleFocus(focusId); });
   const linkDrag = e => e.dataTransfer && [...(e.dataTransfer.types || [])].some(t => /uri-list|moz-url|plain|html/.test(t));
@@ -713,9 +728,10 @@ body.showCmt .foot{display:flex}
   // メニュー(映像と同じネイティブのビューで、いちばん手前に出る)
   function menuData() {
     const names = {}; presets.forEach(p => p.items.forEach(id => { names[id] = nameOf(id); })); items.forEach(id => { names[id] = nameOf(id); });
-    return { fmId: fmTarget, fmName: nameOf(fmTarget), theme, playerOnly, audioOnAdd, evAudioAll, singleOpen, seekOn, showSm, shotDir, shotDirDef: shotDirDef, hideSrcName, viewerSimple, dockPos, alwaysTop, loggedIn, loginVia, appVersion, update: updateInfo, presets, names, evKeys, evTrack, evN, items: items.slice(), dlgCount: items.length, dlgNames: items.map(nameOf) };
+    const hmT = stage.querySelector('.tile[data-id="' + hmFor + '"]'); const hmItems = hmT && hmT.querySelector('.head') ? (hmT.querySelector('.head')._hid || []).map(([k, label]) => ({ k, label })) : [];
+    return { hmItems, fmId: fmTarget, fmName: nameOf(fmTarget), theme, playerOnly, audioOnAdd, evAudioAll, singleOpen, fwNotify, fwAuto, fwOn, seekOn, showSm, shotDir, shotDirDef: shotDirDef, hideSrcName, viewerSimple, dockPos, alwaysTop, loggedIn, loginVia, appVersion, update: updateInfo, presets, names, evKeys, evTrack, evN, items: items.slice(), dlgCount: items.length, dlgNames: items.map(nameOf) };
   }
-  let fmTarget = '';
+  let fmTarget = '', hmFor = '';
   function openMenu(type, btn) {
     const r = btn.getBoundingClientRect();
     if (type === 'set') {   // 設定は、ボタンの右端にそろえて開く
@@ -736,6 +752,12 @@ body.showCmt .foot{display:flex}
       window.mv.frameAct(action.slice(3), String(p)).then(r => { if (r && r.ok === false && r.error) say(r.error, true); });
       return;
     }
+    if (action === 'hm-act') {
+      const tl = stage.querySelector('.tile[data-id="' + String(p && p.id) + '"]'); const k = String(p && p.k);
+      const b = tl && tl.querySelector('.head button.' + (k === 'shot-nocmt' ? 'shot' : k));
+      if (b) { if (k === 'shot-nocmt') b.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })); else b.click(); }
+      return;
+    }
     if (action === 'set-fit720') { fitVideo(1280, 720); return; }
     if (action === 'set-top') { alwaysTop = !!p; window.mv.alwaysTop(alwaysTop); persist(); window.mv.menuData(menuData()); return; }
     if (action === 'set-dockpos') { dockPos = p === 'bottom' ? 'bottom' : 'right'; applyDockPos(); persist(); window.mv.menuData(menuData()); return; }
@@ -746,6 +768,10 @@ body.showCmt .foot{display:flex}
     if (action === 'set-shotdir-open') { window.mv.openShotDir(shotDir); return; }
     if (action === 'set-sm') { showSm = !!p; document.body.classList.toggle('nosm', !showSm); persist(); window.mv.menuData(menuData()); return; }
     if (action === 'set-seek') { seekOn = !!p; window.mv.seek(seekOn); persist(); window.mv.menuData(menuData()); return; }
+    const fwSend = () => { window.mv.followWatch({ notify: fwNotify, auto: fwAuto, on: fwOn }); persist(); window.mv.menuData(menuData()); };
+    if (action === 'set-fwn') { fwNotify = !!p; fwSend(); return; }
+    if (action === 'set-fwa') { fwAuto = !!p; fwSend(); return; }
+    if (action === 'fw-on') { const n = String(p || ''); if (n) { fwOn = fwOn.includes(n) ? fwOn.filter(x => x !== n) : [...fwOn, n].slice(-500); fwSend(); } return; }
     if (action === 'set-so') { singleOpen = !!p; persist(); window.mv.menuData(menuData()); return; }
     if (action === 'set-eaa') { evAudioAll = !!p; persist(); window.mv.menuData(menuData()); return; }
     if (action === 'set-aoa') { audioOnAdd = !!p; persist(); window.mv.menuData(menuData()); return; }
@@ -861,6 +887,10 @@ body.showCmt .foot{display:flex}
       if (typeof s.audioOnAdd === 'boolean') audioOnAdd = s.audioOnAdd;
       if (typeof s.evAudioAll === 'boolean') evAudioAll = s.evAudioAll;
       if (typeof s.singleOpen === 'boolean') singleOpen = s.singleOpen;
+      if (Array.isArray(s.fwOn)) fwOn = s.fwOn.filter(x => typeof x === 'string' && x).slice(0, 500);
+      if (typeof s.fwNotify === 'boolean') fwNotify = s.fwNotify;
+      if (typeof s.fwAuto === 'boolean') fwAuto = s.fwAuto;
+      if (fwNotify || fwAuto) window.mv.followWatch({ notify: fwNotify, auto: fwAuto, on: fwOn });
       if (typeof s.showSm === 'boolean') { showSm = s.showSm; document.body.classList.toggle('nosm', !showSm); }
       if (typeof s.seekOn === 'boolean') { seekOn = s.seekOn; window.mv.seek(seekOn); }
       if (typeof s.shotDir === 'string') shotDir = s.shotDir;

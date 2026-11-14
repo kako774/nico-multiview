@@ -161,6 +161,7 @@ body.sugmode #root{padding:0}
           const tx = el('div', 'tx');
           tx.append(el('div', 'nm', it.name || it.title || it.id), el('div', 'tt', it.name ? it.title : ''), el('div', 'mt', it.id + (it.watch ? ` ・ 来場 ${Number(it.watch).toLocaleString('ja-JP')}` : '')));
           r.append(img, tx, el('div', 'ad', '✓ 追加済み'));
+          if (it.name) { const bl = el('button', 'bell'); bl.type = 'button'; bl.style.cssText = 'flex:none;align-self:center;margin-left:6px;padding:2px 6px;font-size:16px;background:none;border:0;cursor:pointer'; bl.addEventListener('click', e => { e.stopPropagation(); window.menu.act('fw-on', it.name, true); }); r.appendChild(bl); }
           r.addEventListener('click', () => { if (!(data.items || []).includes(it.id)) window.menu.act('fl-add', it.id, true); });
           flRows.set(it.id, r);
         } else {
@@ -170,6 +171,8 @@ body.sugmode #root{padding:0}
           if (mt && mt.textContent !== m) mt.textContent = m;
         }
         r.classList.toggle('added', have.includes(it.id));
+        const bl = r.querySelector('.bell');
+        if (bl) { const on = (data.fwOn || []).includes(it.name); bl.textContent = on ? '🔔' : '🔕'; bl.title = on ? '通知・自動追加の対象です(クリックで外す)' : '通知・自動追加の対象ではありません(クリックで対象にする)'; bl.style.opacity = on ? '1' : '.45'; }
         if (flL.children[i] !== r) flL.insertBefore(r, flL.children[i] || null);
       });
       flRef.disabled = !!busy;
@@ -183,6 +186,19 @@ body.sugmode #root{padding:0}
       if (!r || !r.ok) { if (!flList || force) { flList = null; flErr = (r && r.error) || '取得できませんでした'; } } else { flList = r.list; flErr = ''; }
     }
     paint(false);
+  }
+
+  /* ---- 枠のヘッダーの「⋯」(入りきらないボタンをまとめたメニュー) ---- */
+  function renderHM() {
+    root.textContent = '';
+    root.appendChild(el('h2', '', data.fmName || data.fmId || '放送'));
+    (data.hmItems || []).forEach(it => {
+      const b = el('button', 'lnk', it.label); b.type = 'button';
+      b.style.cssText = 'display:block;width:100%;text-align:left;padding:9px 6px;font-size:14px;text-decoration:none;color:inherit';
+      b.addEventListener('click', () => window.menu.act('hm-act', { id: data.fmId, k: it.k }, false));
+      root.appendChild(b);
+    });
+    report();
   }
 
   /* ---- 枠の放送者名の右クリックメニュー ---- */
@@ -248,6 +264,12 @@ body.sugmode #root{padding:0}
     const so = el('input'); so.type = 'checkbox'; so.checked = !!data.singleOpen; so.title = 'ONにすると、フォロー中・検索・URL貼り付けで開くとき、いまの枠を閉じて、その放送だけを開きます(ギフトイベントは対象外)';
     so.addEventListener('change', () => window.menu.act('set-so', so.checked, true));
     row('追加せず1枠だけで開く', so);
+    const fn = el('input'); fn.type = 'checkbox'; fn.checked = !!data.fwNotify; fn.title = '選んだ放送者(👥の一覧の🔔)の放送が始まったら、Windowsの通知を出します。クリックで枠を追加します';
+    fn.addEventListener('change', () => window.menu.act('set-fwn', fn.checked, true));
+    row('フォロー中の放送が始まったら通知', fn);
+    const fa = el('input'); fa.type = 'checkbox'; fa.checked = !!data.fwAuto; fa.title = '選んだ放送者(👥の一覧の🔔)の放送が始まったら、自動で枠を追加します(音声は消音で始まります)';
+    fa.addEventListener('change', () => window.menu.act('set-fwa', fa.checked, true));
+    row('フォロー中の放送が始まったら自動で枠を追加', fa);
     const sm = el('input'); sm.type = 'checkbox'; sm.checked = data.showSm !== false; sm.title = 'OFFにすると、ギフトイベントの順位つきの枠で、名前の横に出る召喚獣の個数(召・改・神)を表示しません';
     sm.addEventListener('change', () => window.menu.act('set-sm', sm.checked, true));
     row('召喚獣の個数を表示', sm);
@@ -293,7 +315,7 @@ body.sugmode #root{padding:0}
     report();
   }
 
-  function render() { seq++; flBuilt = false; document.documentElement.dataset.theme = data.theme || ''; document.body.classList.toggle('sugmode', type === 'sug'); if (type === 'sug') renderSUG(); else if (type === 'pp') renderPP(); else if (type === 'ev') renderEV(); else if (type === 'fl') renderFL(true); else if (type === 'fm') renderFM(); else if (type === 'dlg') renderDLG(); else if (type === 'set') renderSET(); }
+  function render() { seq++; flBuilt = false; document.documentElement.dataset.theme = data.theme || ''; document.body.classList.toggle('sugmode', type === 'sug'); if (type === 'sug') renderSUG(); else if (type === 'pp') renderPP(); else if (type === 'ev') renderEV(); else if (type === 'fl') renderFL(true); else if (type === 'fm') renderFM(); else if (type === 'hm') renderHM(); else if (type === 'dlg') renderDLG(); else if (type === 'set') renderSET(); }
   window.menu.onShow((t, d) => { type = t; data = d || {}; render(); });
   // 保存・追加などで内容が変わったとき(イベント一覧は取り直さない)
   window.menu.onData(d => { data = d || {}; document.documentElement.dataset.theme = data.theme || ''; if (type === 'sug') renderSUG(); else if (type === 'pp') renderPP(); else if (type === 'ev') { evN = data.evN || evN; renderEV(); } else if (type === 'fl') renderFL(false); else if (type === 'set') renderSET(); });

@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, WebContentsView, ipcMain, shell, session, screen, nativeTheme, net, dialog, clipboard, ClipboardItem, Menu } = require('electron');
+const { app, BrowserWindow, WebContentsView, ipcMain, shell, session, screen, nativeTheme, net, dialog, clipboard, ClipboardItem, Menu, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -1616,6 +1616,48 @@ ipcMain.handle('mv:follow-list', async (_e, force) => {
     return { ok: false, error: '取得できませんでした' };
   }
 });
+/* ---- フォロー中の放送が始まったら、通知 / 自動で枠を追加する(選んだ放送者だけ) ---- */
+let fwNotify = false, fwAuto = false, fwTimer = null, fwKnown = null, fwBusy = false, fwOn = new Set();   // fwOn: 通知・自動追加の対象にした放送者名
+async function fwPoll() {
+  if (fwBusy || !(fwNotify || fwAuto)) return;
+  fwBusy = true;
+  try {
+    if (!(await isLoggedIn().catch(() => false))) return;
+    const list = await followViaApi();
+    if (!list || !(fwNotify || fwAuto)) return;   // 取れなかったときは、何もしない(次回に回す)
+    const now = new Map(list.filter(x => ID_RE.test(String(x.id))).map(x => [x.id, x]));
+    const prev = fwKnown; fwKnown = new Set(now.keys());
+    if (!prev) return;   // 最初の1回は、いま放送中のものを覚えるだけ(通知しない)
+    const fresh = [...now.values()].filter(x => !prev.has(x.id) && x.name && fwOn.has(x.name)).slice(0, 5);
+    if (!fresh.length || !win || win.isDestroyed()) return;
+    const pack = () => fresh.map(x => ({ id: x.id, name: x.name, title: x.title }));
+    if (fwAuto) win.webContents.send('mv:follow-add', pack());
+    if (fwNotify) {
+      try {
+        if (Notification.isSupported()) {
+          const f = fresh[0], more = fresh.length > 1 ? ` ほか${fresh.length - 1}件` : '';
+          const n = new Notification({ title: (fwAuto ? 'フォロー中の放送を追加しました' : 'フォロー中の放送が始まりました') + more, body: ((f.name ? f.name + ': ' : '') + (f.title || f.id)).slice(0, 120), silent: false });
+          n.on('click', () => { if (win && !win.isDestroyed()) { if (win.isMinimized()) win.restore(); win.show(); win.focus(); if (!fwAuto) win.webContents.send('mv:follow-add', pack()); } });
+          n.show();
+        }
+      } catch { /* 通知が出せなくても続ける */ }
+    }
+    appLog('フォロー中の放送を検知: ' + fresh.map(x => x.id).join(', '), 'INFO');
+  } catch (e) { appLog('フォロー中の確認に失敗: ' + String(e && e.message || e).slice(0, 80), 'WARN'); }
+  finally { fwBusy = false; }
+}
+ipcMain.on('mv:follow-watch', (_e, o) => {
+  o = o && typeof o === 'object' ? o : {};
+  fwOn = new Set((Array.isArray(o.on) ? o.on : []).filter(s => typeof s === 'string' && s).slice(0, 500));
+  const was = fwNotify || fwAuto;
+  fwNotify = !!o.notify; fwAuto = !!o.auto;
+  const now = fwNotify || fwAuto;
+  if (now === was) return;
+  clearInterval(fwTimer); fwTimer = null; fwKnown = null;
+  if (!now) return;
+  setTimeout(fwPoll, 1500);
+  fwTimer = setInterval(fwPoll, 60000);
+});
 ipcMain.handle('mv:ev-list', async (_e, extraKeys) => {
   const now = Date.now() / 1000;
   const found = new Map();
@@ -1659,7 +1701,9 @@ function summonKind(name) {
   if (!t.startsWith('召喚獣')) return null;
   if (t.includes('神') || t.includes('ゴッド')) return 'god';
   if (t.includes('改')) return 'kai';
-  return t === '召喚獣' ? 'normal' : null;
+  // 5色召喚獣(色違い: クローバー・ローズ・パール・アクア・サンダー)も、ふつうの召喚獣として数える
+  const rest = t.slice(3).replace(/[()（）「」【】\[\]・:：_-]/g, '');
+  return rest === '' || /^(クローバー|ローズ|パール|アクア|サンダー)$/.test(rest) ? 'normal' : null;
 }
 async function summonsOf(lv) {
   const out = { normal: 0, kai: 0, god: 0 };
@@ -1753,7 +1797,7 @@ function placeMenu(h) {
   menuView.setBounds({ x: Math.round(x), y: Math.round(y), width: Math.round(w), height: Math.round(Math.max(60, Math.min(h || 320, ch - y - 8))) });
 }
 ipcMain.on('mv:menu-open', async (_e, type, anchor, data) => {
-  if (!win || !['ev', 'pp', 'dlg', 'sug', 'set', 'fl', 'fm'].includes(type)) return;
+  if (!win || !['ev', 'pp', 'dlg', 'sug', 'set', 'fl', 'fm', 'hm'].includes(type)) return;
   if (menuOpen && menuType === type) { closeMenu(); return; }
   if (!menuOpen && menuClosedType === type && Date.now() - menuClosedAt < 300) return;   // ボタンを押して閉じた直後の再オープンを防ぐ
   menuLatest = data; menuOpening = true;
@@ -1959,6 +2003,32 @@ ipcMain.on('emo:ready', () => emoPush());
 ipcMain.on('emo:pick', (_e, id) => emoLoad(id));
 ipcMain.on('emo:reopen', () => { if (emoTarget) emoLoad(emoTarget); });
 ipcMain.on('mv:emotion', (_e, id) => { if (ID_RE.test(String(id))) openEmotion(id); });
+// ニコニ広告: その放送の広告を出す画面(nicoad)を、別窓で開く(ログインはアプリのものを共有)
+let adWin = null;
+const AD_URL = id => `https://nicoad.nicovideo.jp/live/publish/${id}?frontend_id=9`;
+function openAd(id) {
+  const url = AD_URL(id);
+  if (adWin && !adWin.isDestroyed()) {
+    if (adWin.isMinimized()) adWin.restore(); adWin.show(); adWin.focus(); adWin.setTitle(`ニコニ広告 - ${id}`);
+    adWin.webContents.loadURL(url).catch(e => appLog(`ニコニ広告を開けませんでした: ${String(e && e.message || e).slice(0, 80)}`, 'WARN'));
+    appLog(`${id}: ニコニ広告を開きました`); return;
+  }
+  adWin = new BrowserWindow({
+    width: 560, height: 820, minWidth: 360, minHeight: 400,
+    title: `ニコニ広告 - ${id}`, icon: path.join(__dirname, 'icon.png'), autoHideMenuBar: true, backgroundColor: '#ffffff',
+    webPreferences: { partition: PARTITION, contextIsolation: true, nodeIntegration: false, sandbox: true },
+  });
+  adWin.setMenuBarVisibility(false);
+  // 同じニコニコの画面は窓の中で、それ以外のページは普段のブラウザで開く
+  adWin.webContents.setWindowOpenHandler(({ url: u }) => {
+    if (NICO_HOST_RE.test(u)) { adWin.webContents.loadURL(u).catch(() => {}); } else if (/^https:\/\//.test(u)) shell.openExternal(u);
+    return { action: 'deny' };
+  });
+  adWin.on('closed', () => { adWin = null; });
+  adWin.webContents.loadURL(url).catch(e => appLog(`ニコニ広告を開けませんでした: ${String(e && e.message || e).slice(0, 80)}`, 'WARN'));
+  appLog(`${id}: ニコニ広告を開きました`);
+}
+ipcMain.on('mv:ad', (_e, id) => { if (ID_RE.test(String(id))) openAd(id); });
 // 枠の放送者名の右クリックメニュー(放送の詳細・放送のURLのコピー・放送者のユーザーページ)
 const PROG_JS = `(() => {
   try {

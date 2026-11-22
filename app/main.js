@@ -381,6 +381,98 @@ ipcMain.on('mv:toast', async (_e, text, err) => {
   win.contentView.addChildView(toastView); toastShown = true;
   clearTimeout(toastTimer); toastTimer = setTimeout(hideToast, err ? 8000 : 4500);
 });
+// ニコ生プレイヤーの「ゲーム・ギフト・エモーション演出を表示」。 null = アプリからは変えない(ニコ生側の設定のまま)
+// プレイヤーは、この設定を読み込みのときに保存領域(localStorage の LeoPlayer_Akashic_IsEnabled)から読む(view-preload.js が先に書いておく)。
+// 開いている枠には、読み込み直さずに反映するため、枠の中でプレイヤーの設定画面のスイッチを(見えないようにして)押す
+let fxPref = 'true';   // 全体の設定(初期は表示)。 枠ごとの一時的な切り替えが残らないよう、枠を読み込むたびに、この値を書き込む
+const fxFrame = new Map();   // 枠ごとの一時的な指定(lv番号 -> true/false)。保存しない。枠を閉じると消える
+const fxWant = id => (fxFrame.has(id) ? fxFrame.get(id) : fxPref === 'true');
+const fxReloadAt = new Map();   // 演出の反映のために枠を読み込み直した時刻
+const fxActual = new Map();  // 枠のプレイヤーの、実際の状態(読み込みのときの値と、スイッチを押した結果)。メニューの表示に使う
+const FX_JS = `(() => {
+  if (window.__nmvFxSet) return;
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const q = s => document.querySelector(s);
+  const FIELD = '[class*="player-akashic-effect-disabled-toggle-button-field"] button';
+  const wait = async (fn, ms) => { for (let t = 0; t < ms; t += 100) { const v = fn(); if (v) return v; await sleep(100); } return null; };
+  const run = async (want, keepLs) => {
+    if (!(await wait(() => q('button[class*="setting-button"]'), 20000))) return 'no-player';
+    const st = document.createElement('style'); st.textContent = '[class*="ga-ns-player-setting-view"],[class*="setting-popup-control"]{opacity:0 !important}'; document.documentElement.appendChild(st);
+    let opened = false; let prev = null; try { prev = localStorage.getItem('LeoPlayer_Akashic_IsEnabled'); } catch {}
+    try {
+      if (!q(FIELD)) {
+        q('button[class*="setting-button"]').click(); opened = true;
+        const d = await wait(() => q('button[class*="detail-setting-button"]'), 2500); if (!d) return 'no-detail';
+        await sleep(150); d.click();
+        if (!(await wait(() => q(FIELD), 3000))) return 'no-field';
+      }
+      await sleep(100);
+      if ((q(FIELD).getAttribute('data-toggle-state') === 'true') !== want) { q(FIELD).click(); await wait(() => q(FIELD) && (q(FIELD).getAttribute('data-toggle-state') === 'true') === want, 1500); }
+      const res = q(FIELD) ? q(FIELD).getAttribute('data-toggle-state') : 'gone';
+      // 表示に戻したのに、演出の描画面が戻らないときは、失敗として知らせる(本体が、その枠だけ読み込み直す)
+      if (want && res === 'true' && q('#akashic-gameview') && !(await wait(() => q('#akashic-gameview canvas'), 4000))) return 'no-canvas';
+      return res;
+    } finally {
+      if (opened) { const f = q('[class*="player-akashic-effect-disabled-toggle-button-field"]'); const v = f && f.closest('[class*="ga-ns-player-setting-view"]'); const c = v && v.querySelector('button[class*="close-button"]'); if (c) c.click(); }
+      const keep = () => { try { const k = keepLs === 'prev' ? prev : keepLs; if (k === 'true' || k === 'false') localStorage.setItem('LeoPlayer_Akashic_IsEnabled', k); } catch {} };
+      keep();
+      await sleep(900);   // 設定画面が閉じきるまで待つ(続けて押すと効かないため)
+      keep();   // プレイヤーが遅れて保存し直すことがあるので、もう一度戻す
+      setTimeout(keep, 3000);
+      st.remove();
+    }
+  };
+  let chain = Promise.resolve();
+  window.__nmvFxSet = (want, keepLs) => (chain = chain.then(() => run(want, keepLs), () => run(want, keepLs)));
+})()`;
+// 枠のプレイヤーの演出を、want(true=表示)にする。 保存領域は、全体の設定(なければ変えた値のまま)に戻す
+const applyFx = (id, wc) => {
+  if (!wc || wc.isDestroyed()) return Promise.resolve('');
+  const want = fxWant(id), keep = fxPref;
+  return wc.executeJavaScript(`${FX_JS}; window.__nmvFxSet(${want ? 'true' : 'false'}, ${JSON.stringify(keep)})`).then(r => {
+    if (r === 'true' || r === 'false') fxActual.set(id, r === 'true');
+    if (r !== String(want)) {
+      // スイッチで切り替えられなかったときは、その枠だけ読み込み直して反映する(読み込みのときに、その枠の指定を書き込む)
+      appLog(`演出の切り替え(${id}): ${r}。この枠を読み込み直して反映します`, 'WARN');
+      const last = fxReloadAt.get(id) || 0;   // 読み込み直しは、1分に1回まで(繰り返さないように)
+      if (!wc.isDestroyed() && r !== 'no-player' && Date.now() - last > 60000) { fxReloadAt.set(id, Date.now()); noticed.delete(id); fxActual.set(id, want); wc.loadURL(WATCH(id)); return String(want); }
+    }
+    return r;
+  }).catch(() => '');
+};
+ipcMain.on('mv:fx-get', e => {
+  // 読み込み直しで反映するとき(スイッチを押せなかったとき)は、その枠の指定を返す
+  let id = ''; for (const [k, vw] of views) if (vw.webContents === e.sender) id = k;
+  e.returnValue = id && fxFrame.has(id) ? String(fxFrame.get(id)) : fxPref;
+});
+ipcMain.on('mv:fx', (_e, v, apply) => {
+  if (v !== true && v !== false) return;
+  const n = v ? 'true' : 'false';
+  if (n === fxPref) return;
+  fxPref = n; fxFrame.clear();
+  if (apply) for (const [id, vw] of views) applyFx(id, vw.webContents);
+});
+ipcMain.handle('mv:fx-frame', async (_e, id, show) => {
+  if (!ID_RE.test(String(id))) return null;
+  if (!!show === (fxPref === 'true')) fxFrame.delete(id); else fxFrame.set(id, !!show);
+  const vw = views.get(id); if (vw) await applyFx(id, vw.webContents);
+  return fxActual.has(id) ? fxActual.get(id) : fxWant(id);
+});
+// 枠の演出を、いまの実際の状態の逆にする(続けて押されても、1回ずつ順番に処理する)
+const fxQueue = new Map();
+ipcMain.handle('mv:fx-toggle', (_e, id) => {
+  if (!ID_RE.test(String(id))) return null;
+  const job = (fxQueue.get(id) || Promise.resolve()).then(async () => {
+    const show = !(fxActual.has(id) ? fxActual.get(id) : fxWant(id));
+    if (show === (fxPref === 'true')) fxFrame.delete(id); else fxFrame.set(id, show);
+    const vw = views.get(id); if (vw) await applyFx(id, vw.webContents);
+    return fxActual.has(id) ? fxActual.get(id) : fxWant(id);
+  }).catch(() => null);
+  fxQueue.set(id, job);
+  return job;
+});
+// 枠の演出が、いま表示されているか(右クリックのメニューの文言に使う)
+ipcMain.handle('mv:fx-state', (_e, id) => (fxActual.has(id) ? fxActual.get(id) : fxWant(id)));
 ipcMain.on('mv:seek', (_e, v) => { seekOn = v !== false; for (const vw of views.values()) applySeek(vw.webContents); });
 const applyHide = (id, wc) => {
   if (wc.isDestroyed()) return;
@@ -514,6 +606,7 @@ function createWindow() {
   const st = loadState();
   const wb = loadWinBounds();
   if (st && THEMES.includes(st.theme)) setTheme(st.theme);
+  if (st && typeof st.fxOn === 'boolean') fxPref = st.fxOn ? 'true' : 'false';   // 起動直後に開く枠にも、最初から効かせる
   win = new BrowserWindow({
     width: (wb && wb.width) || 1600, height: (wb && wb.height) || 900, minWidth: 720, minHeight: 480,
     ...(wb && Number.isFinite(wb.x) ? { x: wb.x, y: wb.y } : {}),
@@ -546,6 +639,9 @@ function createWindow() {
     if (toastWin && !toastWin.isDestroyed()) toastWin.destroy();
     if (viewerWin && !viewerWin.isDestroyed()) viewerWin.close();
     viewerView = null;
+    // 見えない窓(イベント取得・フォロー取得)や設定窓が残ると、終了してもプロセスが残るので、まとめて閉じて終了する
+    for (const w of BrowserWindow.getAllWindows()) { try { if (!w.isDestroyed()) w.destroy(); } catch { /* 無視 */ } }
+    app.quit();
   });
 }
 
@@ -638,7 +734,7 @@ function makeView(id) {
   wc.on('dom-ready', () => {
     wc.insertCSS(PLAYER_CSS).catch(() => {});
     applyGlassView(wc, view);
-    wc.executeJavaScript(PLAYER_JS).then(() => { applyMode(wc); applyVol(id, wc); applyHide(id, wc); applySeek(wc); }).catch(() => {});
+    wc.executeJavaScript(PLAYER_JS).then(() => { applyMode(wc); applyVol(id, wc); applyHide(id, wc); applySeek(wc); fxActual.set(id, fxWant(id)); if (fxFrame.has(id)) applyFx(id, wc); }).catch(() => {});
     sendInfo(id, wc);
   });
   wc.on('did-start-navigation', (_e, _u, _inPlace, isMain) => { if (isMain) watchReady(id, wc); });
@@ -676,7 +772,7 @@ function syncViews(rects, audioId, wantPlayerOnly, vols, hides) {
     if (!want.has(id)) {
       win.contentView.removeChildView(v);
       v.webContents.close();
-      views.delete(id); readyIds.delete(id); closeEmotion(id);
+      views.delete(id); readyIds.delete(id); closeEmotion(id); fxFrame.delete(id); fxActual.delete(id);
       pushSources();
     }
   }
@@ -1719,14 +1815,53 @@ async function summonsOf(lv) {
   return out;
 }
 const evLiveCache = new Map(), EV_SLOW_MS = 30000;   // uid → { lv, sm, 取得時刻 }
-ipcMain.handle('mv:ev-top', async (_e, key, n) => {
+/* ---- 紅白の「イベントランキング」: ニコ生ランキングのイベントのページ(作者のサイト)で計算した順位を使う ----
+   見えない窓でページを開き、ページが用意した window.__nmvEvents から読み取る(計算のしかたを、ページと完全に同じにするため) */
+const EVENTS_PAGE = process.env.NMV_EVENTS_PAGE || 'https://nico-ran.stream/events';   // 動作確認のときだけ、環境変数でステージングに向けられる
+let siteWin = null, siteReady = null, siteRefAt = 0, siteUsedAt = 0;
+function siteEnsure() {
+  if (siteWin && !siteWin.isDestroyed()) return siteReady;
+  siteWin = new BrowserWindow({ show: false, width: 1200, height: 900, webPreferences: { partition: 'persist:nmv-site', contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false } });
+  siteWin.webContents.setAudioMuted(true);
+  siteWin.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  siteWin.on('closed', () => { siteWin = null; siteReady = null; });
+  siteRefAt = Date.now();
+  siteReady = siteWin.loadURL(EVENTS_PAGE).then(() => true, () => false);
+  return siteReady;
+}
+// 使われなくなったら(5分)、見えない窓を閉じる
+setInterval(() => { if (siteWin && !siteWin.isDestroyed() && Date.now() - siteUsedAt > 5 * 60000) { try { siteWin.destroy(); } catch { /* 無視 */ } } }, 60000);
+async function siteTop(key, n, inclTop) {
+  siteUsedAt = Date.now();
+  if (!(await siteEnsure()) || !siteWin || siteWin.isDestroyed()) throw new Error('page');
+  const wc = siteWin.webContents;
+  // 1分ごとに、ページに取り直してもらう(ページは、隠れていると自分では更新しないため)
+  if (Date.now() - siteRefAt > 60000) { siteRefAt = Date.now(); await wc.executeJavaScript('window.__nmvEvents && window.__nmvEvents.refresh()').catch(() => {}); }
+  for (let i = 0; i < 40; i++) {
+    const r = await wc.executeJavaScript(`(() => { const E = window.__nmvEvents; if (!E || !E.ready()) return null; return E.top(${JSON.stringify(key)}, ${Number(n) || 4}, ${inclTop ? 'true' : 'false'}); })()`).catch(() => null);
+    if (r) return r;
+    await new Promise(res => setTimeout(res, 500));
+  }
+  throw new Error('not ready');
+}
+ipcMain.handle('mv:ev-top', async (_e, key, n, mode) => {
   if (!KEY_RE.test(String(key))) return { ok: false };
   const lim = Math.min(Math.max(parseInt(n, 10) || 4, 1), 12);
   try {
-    const j = await evGet(`${AUD}/auditions/${key}/rankings?limit=${lim}`);
-    const list = ((j && j.data && j.data.entry_items) || []).slice(0, lim)
+    let list;
+    if (mode === 'event' || mode === 'event-all') {
+      list = (await siteTop(String(key), lim, mode === 'event-all')).slice(0, lim)
+        .map(e => ({ rank: Number(e.rank) || 0, uid: String(e.id || ''), name: String(e.name || '').slice(0, 40), score: Number(e.score) || 0, icon: imgOk(e.icon) }))
+        .filter(e => /^\d{1,12}$/.test(e.uid));
+    } else {
+    // year-ex: 公式の順位(年間)から、上位10位を除いて、11位を1位として数え直す
+    const skip = mode === 'year-ex' ? 10 : 0;
+    const j = await evGet(`${AUD}/auditions/${key}/rankings?limit=${lim + skip}`);
+    list = ((j && j.data && j.data.entry_items) || [])
       .map(e => ({ rank: Number(e.rank) || 0, uid: String(e.item_id || ''), name: String(e.name || '').slice(0, 40), score: Number(e.total_score) || 0, icon: imgOk(e.thumbnail_url) }))
-      .filter(e => /^\d{1,12}$/.test(e.uid));
+      .filter(e => /^\d{1,12}$/.test(e.uid) && e.rank > skip).slice(0, lim)
+      .map(e => (skip ? Object.assign(e, { rank: e.rank - skip }) : e));
+    }
     // 順位・点数は毎回(10秒ごと)取る。放送中の枠・召喚獣の数は通信が多いので、覚えておいて30秒ごとに取り直す
     const now = Date.now();
     await Promise.all(list.map(async e => {
@@ -1794,11 +1929,12 @@ function placeMenu(h) {
   const w = Math.min(menuPos.w || 460, cw - 16);
   const x = Math.max(8, Math.min(menuPos.x, cw - w - 8));
   const y = Math.max(0, menuPos.y);
-  menuView.setBounds({ x: Math.round(x), y: Math.round(y), width: Math.round(w), height: Math.round(Math.max(60, Math.min(h || 320, ch - y - 8))) });
+  menuView.setBounds({ x: Math.round(x), y: Math.round(y), width: Math.round(w), height: Math.round(Math.max(menuType === 'vol' ? 30 : 60, Math.min(h || 320, ch - y - 8))) });
 }
 ipcMain.on('mv:menu-open', async (_e, type, anchor, data) => {
-  if (!win || !['ev', 'pp', 'dlg', 'sug', 'set', 'fl', 'fm', 'hm'].includes(type)) return;
-  if (menuOpen && menuType === type) { closeMenu(); return; }
+  if (!win || !['ev', 'pp', 'dlg', 'sug', 'set', 'fl', 'fm', 'hm', 'vol'].includes(type)) return;
+  if (type === 'vol' && menuOpen && menuType !== 'vol') return;   // ほかのメニューが開いているときは、音量バーは出さない
+  if (menuOpen && menuType === type && type !== 'vol') { closeMenu(); return; }
   if (!menuOpen && menuClosedType === type && Date.now() - menuClosedAt < 300) return;   // ボタンを押して閉じた直後の再オープンを防ぐ
   menuLatest = data; menuOpening = true;
   await ensureMenu();
@@ -1806,22 +1942,62 @@ ipcMain.on('mv:menu-open', async (_e, type, anchor, data) => {
   data = menuLatest;
   menuType = type; menuOpen = true; menuOpenedAt = Date.now();
   menuPos = { x: Number(anchor && anchor.left) || 8, y: (Number(anchor && anchor.bottom) || 0) + 4, w: Number(anchor && anchor.width) || 0 };
-  placeMenu(320);
+  placeMenu(type === 'vol' ? 40 : 320);
   win.contentView.removeChildView(menuView); win.contentView.addChildView(menuView);
   menuView.setVisible(true);
   menuView.webContents.send('menu:show', type, data);
-  if (type !== 'sug') menuView.webContents.focus();   // 検索候補は、入力欄のフォーカスを奪わない
+  if (type !== 'sug' && type !== 'vol') menuView.webContents.focus();   // 検索候補は、入力欄のフォーカスを奪わない
 });
 ipcMain.on('mv:menu-close', (_e, force) => {
   if (!menuOpen) return;
   if (force) { if (menuType === 'sug') closeMenu(); return; }
+  if (menuType === 'vol') { closeMenu(); return; }
   if (menuType !== 'sug' && Date.now() - menuOpenedAt > 300) closeMenu();
 });
-ipcMain.on('mv:menu-data', (_e, data) => { if (menuOpening) menuLatest = data; else if (menuOpen && menuView) menuView.webContents.send('menu:data', data); });
-ipcMain.on('menu:size', (e, h) => { if (menuOpen && menuView && e.sender === menuView.webContents) placeMenu(Number(h)); });
-ipcMain.on('menu:close', e => { if (menuView && e.sender === menuView.webContents) closeMenu(); });
+ipcMain.on('mv:menu-data', (_e, data) => { if (menuOpening) menuLatest = data; else if (menuOpen && menuView) menuView.webContents.send('menu:data', data); if (setWin && !setWin.isDestroyed()) setWin.webContents.send('menu:data', data); });
+let menuH = 0;
+ipcMain.on('menu:size', (e, h) => { if (menuOpen && menuView && e.sender === menuView.webContents) { menuH = Number(h); placeMenu(menuH); } });
+ipcMain.on('mv:menu-move', (_e, anchor) => {   // 窓の大きさが変わったとき、メニューをボタンの位置に付け直す
+  if (!menuOpen || !menuView || !win) return;
+  menuPos = { x: Number(anchor && anchor.left) || 8, y: (Number(anchor && anchor.bottom) || 0) + 4, w: Number(anchor && anchor.width) || 0 };
+  placeMenu(menuH);
+});
+ipcMain.on('menu:close', e => { if (menuView && e.sender === menuView.webContents) closeMenu(); else if (setWin && !setWin.isDestroyed() && e.sender === setWin.webContents) setWin.close(); });
+/* ---- 設定ウィンドウ(⚙のメニューの「すべての設定…」)。 中身は menu.html を「setall」として使う ---- */
+let setWin = null;
+const SET_BG = { glassb: '#1e1e22', glassf: '#101013', glassc: '#fbfbfd' };
+const setBg = () => SET_BG[curTheme] || (nativeTheme.shouldUseDarkColors ? '#181b22' : '#ffffff');
+function openSettings() {
+  if (setWin && !setWin.isDestroyed()) { if (setWin.isMinimized()) setWin.restore(); setWin.show(); setWin.focus(); return; }
+  const wb = win && !win.isDestroyed() ? win.getBounds() : null;
+  setWin = new BrowserWindow({
+    width: 600, height: 640, minWidth: 460, minHeight: 360, parent: win || undefined, show: false,
+    ...(wb ? { x: Math.round(wb.x + (wb.width - 600) / 2), y: Math.round(wb.y + Math.max(40, (wb.height - 640) / 2)) } : {}),
+    title: '設定 - ニコ生マルチビュー', icon: path.join(__dirname, 'icon.png'), autoHideMenuBar: true, backgroundColor: setBg(),
+    webPreferences: { preload: path.join(__dirname, 'menu-preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
+  });
+  setWin.setMenuBarVisibility(false);
+  setWin.on('page-title-updated', e => e.preventDefault());   // 題名は「設定」のままにする
+  setWin.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  setWin.webContents.on('will-navigate', e => e.preventDefault());
+  setWin.webContents.once('did-finish-load', () => {
+    if (!setWin || setWin.isDestroyed()) return;
+    setWin.webContents.send('menu:show', 'setall', { theme: curTheme });
+    if (win && !win.isDestroyed()) win.webContents.send('mv:menu-act', 'req-data', null);   // 本体に、いまの設定を送ってもらう
+    setWin.show();
+  });
+  setWin.on('closed', () => { setWin = null; });
+  setWin.loadFile(path.join(__dirname, 'menu.html'));
+}
+nativeTheme.on('updated', () => { if (setWin && !setWin.isDestroyed()) setWin.setBackgroundColor(setBg()); });
 ipcMain.on('menu:act', (e, action, payload, keep) => {
+  if (setWin && !setWin.isDestroyed() && e.sender === setWin.webContents) {
+    if (win && !win.isDestroyed()) win.webContents.send('mv:menu-act', String(action), payload);
+    if (action === 'set-theme') setTimeout(() => { if (setWin && !setWin.isDestroyed()) setWin.setBackgroundColor(setBg()); }, 50);
+    return;
+  }
   if (!menuView || e.sender !== menuView.webContents) return;
+  if (action === 'set-all') { closeMenu(); openSettings(); return; }
   if (win && !win.isDestroyed()) win.webContents.send('mv:menu-act', String(action), payload);
   if (menuType === 'sug') { if (win && !win.isDestroyed()) win.webContents.focus(); return; }   // 候補を選んだら入力欄へ戻す
   if (!keep) closeMenu();

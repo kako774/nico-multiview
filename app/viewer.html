@@ -117,13 +117,15 @@ body.nosrc .line{grid-template-columns:3.6em 4.4em 10px 9.5em 1fr}
 
 /* 選択肢の一覧は、背景が透けないよう、はっきりした色にする */
 /* ガラス系テーマでも、右クリックのメニューは透けさせない(読みにくいため) */
-:root[data-theme="glassb"] .menu{background:#1d2030;box-shadow:0 8px 28px #000a}
-:root[data-theme="glassf"] .menu{background:#16171e;box-shadow:0 8px 28px #000a}
+:root[data-theme="glassb"] .menu{background:#1e1e22;box-shadow:0 8px 28px #000a}
+:root[data-theme="glassf"] .menu{background:#101013;box-shadow:0 8px 28px #000a}
 :root[data-theme="glassc"] .menu{background:#fbfbfd;box-shadow:0 8px 28px #0003}
 :root[data-theme="glassb"] .menu button,:root[data-theme="glassf"] .menu button{background:rgba(255,255,255,.07)}
 :root[data-theme="glassc"] .menu button{background:rgba(0,0,0,.05)}
 :root[data-theme] .menu button:hover{background:var(--btnhv)}
-:root[data-theme="glassb"] option{background:#232638;color:#f3f4f8}
+:root[data-theme="glassb"] .menu button:hover,:root[data-theme="glassf"] .menu button:hover{background:rgba(255,255,255,.16)}
+:root[data-theme="glassc"] .menu button:hover{background:rgba(0,0,0,.1)}
+:root[data-theme="glassb"] option{background:#26262b;color:#f3f4f8}
 :root[data-theme="glassf"] option{background:#14141b;color:#ececf2}
 :root[data-theme="glassc"] option{background:#ffffff;color:#1c1f26}
 </style>

@@ -3,6 +3,12 @@
 // 「プレイヤーのみ」表示のとき、映像の上でマウスをドラッグすると、枠の並べ替えを始める。
 const { ipcRenderer, webFrame } = require('electron');
 
+// 「ゲーム・ギフト・エモーション演出を表示」を、アプリの設定どおりにする(プレイヤーが読む前に、保存領域へ書いておく)
+try {
+  const fx = ipcRenderer.sendSync('mv:fx-get');
+  if ((fx === 'true' || fx === 'false') && location.hostname === 'live.nicovideo.jp' && localStorage.getItem('LeoPlayer_Akashic_IsEnabled') !== fx) localStorage.setItem('LeoPlayer_Akashic_IsEnabled', fx);
+} catch { /* 無視 */ }
+
 // コメント投稿の「184(なふだ)」を、アプリの指定どおりにする。
 // ページがニコ生へ送る投稿メッセージ(postComment)の isAnonymous を、アプリ側の指定(window.__nmvAnon)で上書きする。
 // 設定画面のスイッチを操作する方式は、画面の作りに依存して壊れやすいので使わない。

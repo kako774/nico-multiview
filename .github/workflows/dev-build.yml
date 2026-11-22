@@ -61,4 +61,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete dev-1.1.6 --cleanup-tag --yes --repo "$GITHUB_REPOSITORY" || true
-          gh release create dev-1.1.6 app/NicoMultiView-win-*.zip --prerelease --title "1.1.6 テスト(Electron 45.4.1)" --notes "テスト用のビルドです" --target "$GITHUB_SHA" --repo "$GITHUB_REPOSITORY"
+          gh release create dev-1.1.6 NicoMultiView-win-*.zip --prerelease --title "1.1.6 テスト(Electron 45.4.1)" --notes "テスト用のビルドです" --target "$GITHUB_SHA" --repo "$GITHUB_REPOSITORY"
